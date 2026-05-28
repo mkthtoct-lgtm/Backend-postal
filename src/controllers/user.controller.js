@@ -107,8 +107,91 @@ class UserController {
       });
     }
   }
+  /**
+   * Quản trị viên tạo người dùng mới trực tiếp
+   */
+  async createUser(req, res) {
+    try {
+      const { email, password, fullName, roleId, departmentId } = req.body;
 
+      // Validation bắt buộc các trường cơ bản (name, email, password, role)
+      if (!fullName || !email || !password || !roleId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng cung cấp đầy đủ các thông tin bắt buộc: Họ tên, Email, Mật khẩu và Vai trò.',
+        });
+      }
 
+      // Kiểm duyệt định dạng email
+      if (!validateEmailFormat(email)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Định dạng Email không hợp lệ (Ví dụ: user@example.com).',
+        });
+      }
+
+      // Kiểm duyệt độ phức tạp mật khẩu
+      const passwordValidation = validatePasswordComplexity(password);
+      if (!passwordValidation.isValid) {
+        return res.status(400).json({
+          success: false,
+          message: passwordValidation.message,
+        });
+      }
+
+      // Kiểm duyệt tính hợp lệ của roleId (phải là MongoDB ObjectId hợp lệ)
+      if (!mongoose.Types.ObjectId.isValid(roleId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vai trò (roleId) được cung cấp không hợp lệ.',
+        });
+      }
+
+      // Kiểm duyệt departmentId (nếu được truyền lên, phải là ObjectId hợp lệ, ngược lại đặt về null)
+      let cleanDepartmentId = null;
+      if (departmentId && mongoose.Types.ObjectId.isValid(departmentId)) {
+        cleanDepartmentId = new mongoose.Types.ObjectId(departmentId);
+      }
+
+      // Kiểm tra email trùng lặp trong hệ thống
+      const existingUser = await userService.findByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email này đã được sử dụng trong hệ thống.',
+        });
+      }
+
+      // Mã hóa mật khẩu
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Tạo mới tài khoản
+      const newUser = await userService.create({
+        fullName,
+        email,
+        passwordHash,
+        roleId: new mongoose.Types.ObjectId(roleId),
+        departmentId: cleanDepartmentId,
+        status: 'active', // Trạng thái mặc định là active
+      });
+
+      // Ẩn mật khẩu khi phản hồi
+      const userObj = newUser.toObject();
+      delete userObj.passwordHash;
+
+      return res.status(201).json({
+        success: true,
+        message: 'Tạo tài khoản người dùng mới thành công.',
+        data: userObj,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi tạo mới người dùng.',
+        error: error.message,
+      });
+    }
+  }
 
   /**
    * Cập nhật thông tin người dùng
@@ -137,15 +220,45 @@ class UserController {
 
       const updateData = {};
 
-      if (fullName) updateData.fullName = fullName;
-      if (phone) updateData.phone = phone;
-      if (roleId) updateData.roleId = roleId;
-      if (departmentId) updateData.departmentId = departmentId;
-      if (status) {
+      if (fullName !== undefined) {
+        if (!fullName.trim()) {
+          return res.status(400).json({
+            success: false,
+            message: 'Họ tên không được phép để trống.',
+          });
+        }
+        updateData.fullName = fullName.trim();
+      }
+
+      if (phone !== undefined) {
+        updateData.phone = phone ? phone.trim() : null;
+      }
+
+      // Ép kiểu và kiểm duyệt tính hợp lệ của roleId nếu được gửi lên
+      if (roleId !== undefined) {
+        if (!roleId || !mongoose.Types.ObjectId.isValid(roleId)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Vai trò (roleId) được cung cấp không hợp lệ.',
+          });
+        }
+        updateData.roleId = new mongoose.Types.ObjectId(roleId);
+      }
+
+      // Ép kiểu và kiểm duyệt tính hợp lệ của departmentId
+      if (departmentId !== undefined) {
+        if (departmentId && mongoose.Types.ObjectId.isValid(departmentId)) {
+          updateData.departmentId = new mongoose.Types.ObjectId(departmentId);
+        } else {
+          updateData.departmentId = null; // Đặt về null nếu rỗng hoặc không phải ObjectId hợp lệ
+        }
+      }
+
+      if (status !== undefined) {
         if (!['active', 'inactive', 'suspended'].includes(status)) {
           return res.status(400).json({
             success: false,
-            message: 'Trạng thái status không hợp lệ.',
+            message: 'Trạng thái status không hợp lệ. Chỉ chấp nhận: active, inactive, suspended.',
           });
         }
         updateData.status = status;
@@ -153,21 +266,22 @@ class UserController {
 
       // Xử lý cập nhật Email
       if (email && email.toLowerCase().trim() !== user.email) {
-        if (!validateEmailFormat(email)) {
+        const cleanEmail = email.toLowerCase().trim();
+        if (!validateEmailFormat(cleanEmail)) {
           return res.status(400).json({
             success: false,
             message: 'Định dạng Email mới không hợp lệ.',
           });
         }
 
-        const emailInUse = await userService.findByEmail(email);
+        const emailInUse = await userService.findByEmail(cleanEmail);
         if (emailInUse) {
           return res.status(400).json({
             success: false,
             message: 'Email mới này đã được sử dụng bởi một tài khoản khác.',
           });
         }
-        updateData.email = email;
+        updateData.email = cleanEmail;
       }
 
       const updatedUser = await userService.update(id, updateData);
@@ -181,6 +295,54 @@ class UserController {
       return res.status(500).json({
         success: false,
         message: 'Lỗi máy chủ khi cập nhật thông tin người dùng.',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Cập nhật trạng thái người dùng (Khóa/Mở khóa)
+   */
+  async updateUserStatus(req, res) {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      // Kiểm tra định dạng ObjectId
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID người dùng không hợp lệ.',
+        });
+      }
+
+      if (!status || !['active', 'inactive', 'suspended'].includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Trạng thái status không hợp lệ. Chỉ chấp nhận: active, inactive, suspended.',
+        });
+      }
+
+      // Kiểm tra user có tồn tại không
+      const user = await userService.findById(id);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Người dùng không tồn tại hoặc đã bị xóa khỏi hệ thống.',
+        });
+      }
+
+      const updatedUser = await userService.update(id, { status });
+
+      return res.status(200).json({
+        success: true,
+        message: status === 'active' ? 'Mở khóa tài khoản thành công.' : 'Khóa tài khoản thành công.',
+        data: updatedUser,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi cập nhật trạng thái người dùng.',
         error: error.message,
       });
     }
