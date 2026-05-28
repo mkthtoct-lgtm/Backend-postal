@@ -1,22 +1,21 @@
-const express = require("express");
-const cors = require("cors");
+const express = require('express');
+const cors = require('cors');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-app.get("/", (req, res) => {
+app.get('/', (req, res) => {
   res.json({
-    message: "Backend Postal API is running",
+    message: 'Backend Postal API is running',
   });
 });
 
-app.get("/health", (req, res) => {
+app.get('/health', (req, res) => {
   res.json({
-    status: "ok",
-    service: "backend-postal",
-    database: "hito_crm",
+    status: 'ok',
+    service: 'backend-postal',
   });
 });
 
