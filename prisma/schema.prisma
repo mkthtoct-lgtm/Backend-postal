@@ -1,0 +1,745 @@
+// =====================================================
+// HITO CRM / VISA / DU HOC - Prisma Schema for MongoDB
+// File: schema.prisma
+// =====================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+}
+
+// =====================================================
+// ENUMS
+// =====================================================
+
+enum CommonStatus {
+  active
+  inactive
+  suspended
+  pending
+  processing
+  submitted
+  approved
+  rejected
+  cancelled
+  archived
+}
+
+enum UserStatus {
+  active
+  inactive
+  suspended
+}
+
+enum ContractStatus {
+  pending
+  active
+  expired
+  terminated
+}
+
+enum LeadStatus {
+  new
+  contacted
+  qualified
+  converted
+  lost
+}
+
+enum VisaProfileStatus {
+  processing
+  submitted
+  approved
+  rejected
+  cancelled
+}
+
+enum DocumentStatus {
+  pending
+  submitted
+  approved
+  rejected
+}
+
+enum PostStatus {
+  draft
+  published
+  archived
+}
+
+enum WebinarStatus {
+  upcoming
+  live
+  ended
+  cancelled
+}
+
+enum AccountingTransactionType {
+  service_fee
+  commission_payment
+  refund
+  expense
+}
+
+enum AccountingTransactionStatus {
+  pending
+  paid
+  cancelled
+  refunded
+}
+
+enum RecruitmentStatus {
+  open
+  interviewing
+  hired
+  closed
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum AccessLevel {
+  public
+  internal
+  restricted
+}
+
+enum PermissionAction {
+  read
+  create
+  update
+  delete
+  export
+  approve
+  assign
+  manage
+  sync
+}
+
+enum DataScope {
+  all
+  department
+  assigned
+  own
+  partner
+  public
+}
+
+// =====================================================
+// EMBEDDED TYPES
+// =====================================================
+
+type UserPermissionOverride {
+  permissionId String  @db.ObjectId
+  isDenied     Boolean @default(false)
+}
+
+type OfficeMember {
+  userId        String    @db.ObjectId
+  positionTitle String?
+  joinedAt      DateTime?
+}
+
+type ProductCost {
+  itemName     String
+  amount       Float   @default(0)
+  currency     String  @default("VND")
+  note         String?
+  displayOrder Int     @default(0)
+}
+
+type ProductRequirement {
+  criteriaType  String
+  criteriaValue String
+  displayOrder  Int    @default(0)
+}
+
+type ProductStep {
+  id                String? @map("_id") @db.ObjectId
+  stepOrder         Int
+  stepName          String
+  description       String?
+  estimatedDuration String?
+}
+
+type VisaTaskChecklist {
+  id          String?   @map("_id") @db.ObjectId
+  taskName    String
+  description String?
+  isCompleted Boolean   @default(false)
+  assignedTo  String?   @db.ObjectId
+  deadline    DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime?
+}
+
+type VisaDocumentItem {
+  id           String?        @map("_id") @db.ObjectId
+  documentName String
+  documentType String?
+  fileUrl      String
+  status       DocumentStatus @default(submitted)
+  uploadedBy   String?        @db.ObjectId
+  reviewedBy   String?        @db.ObjectId
+  reviewedAt   DateTime?
+  note         String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime?
+  deletedAt    DateTime?
+}
+
+// =====================================================
+// 1. ORGANIZATION & RBAC
+// =====================================================
+
+model Department {
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  name        String       @unique
+  managerId   String?      @db.ObjectId
+  manager     User?        @relation("DepartmentManager", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  description String?
+  status      CommonStatus @default(active)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+
+  users        User[]          @relation("UserDepartment")
+  recruitments HrRecruitment[]
+
+  @@index([managerId])
+  @@map("departments")
+}
+
+model Permission {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  name        String           @unique
+  description String?
+  module      String
+  action      PermissionAction
+  dataScope   DataScope
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  roles   Role[]   @relation("RolePermissions", fields: [roleIds], references: [id])
+  roleIds String[] @db.ObjectId
+
+  @@unique([module, action, dataScope])
+  @@index([module])
+  @@index([roleIds])
+  @@map("permissions")
+}
+
+model Role {
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  name        String       @unique
+  description String?
+  status      CommonStatus @default(active)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  permissions   Permission[] @relation("RolePermissions", fields: [permissionIds], references: [id])
+  permissionIds String[]     @db.ObjectId
+  users         User[]
+
+  @@index([permissionIds])
+  @@map("roles")
+}
+
+model User {
+  id                  String                   @id @default(auto()) @map("_id") @db.ObjectId
+  avatarUrl           String?
+  fullName            String
+  email               String                   @unique
+  phone               String?
+  passwordHash        String
+  departmentId        String?                  @db.ObjectId
+  department          Department?              @relation("UserDepartment", fields: [departmentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  roleId              String                   @db.ObjectId
+  role                Role                     @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  permissionOverrides UserPermissionOverride[]
+  status              UserStatus               @default(active)
+  lastLoginAt         DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  deletedAt           DateTime?
+
+  managedDepartments     Department[]            @relation("DepartmentManager")
+  managedOffices         RepresentativeOffice[]  @relation("OfficeManager")
+  createdCustomers       Customer[]              @relation("CustomerCreatedBy")
+  assignedLeads          Lead[]                  @relation("LeadAssignedTo")
+  processingVisaProfiles VisaProfile[]           @relation("VisaProcessingStaff")
+  newsPosts              NewsPost[]              @relation("NewsAuthor")
+  webinars               Webinar[]               @relation("WebinarCreatedBy")
+  uploadedDocuments      KnowledgeDocument[]     @relation("DocumentUploadedBy")
+  aiLogs                 AiAssistantLog[]        @relation("AiLogUser")
+  relatedTransactions    AccountingTransaction[] @relation("TransactionRelatedUser")
+  createdTransactions    AccountingTransaction[] @relation("TransactionCreatedBy")
+  partner                Partner?
+
+  @@index([phone])
+  @@index([departmentId])
+  @@index([roleId])
+  @@map("users")
+}
+
+// =====================================================
+// 2. REPRESENTATIVE OFFICES
+// =====================================================
+
+model RepresentativeOffice {
+  id        String         @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  location  String
+  managerId String?        @db.ObjectId
+  manager   User?          @relation("OfficeManager", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  members   OfficeMember[]
+  status    CommonStatus   @default(active)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  deletedAt DateTime?
+
+  @@index([name])
+  @@index([managerId])
+  @@map("representative_offices")
+}
+
+// =====================================================
+// 3. PRODUCTS
+// product_costs, product_requirements, product_steps are embedded.
+// =====================================================
+
+model ProductCategory {
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  name        String       @unique
+  description String?
+  status      CommonStatus @default(active)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id                    String               @id @default(auto()) @map("_id") @db.ObjectId
+  categoryId            String?              @db.ObjectId
+  category              ProductCategory?     @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  name                  String
+  country               String
+  thumbnailUrl          String?
+  serviceFee            Float                @default(0)
+  currency              String               @default("VND")
+  settlerSupportDetails String?
+  description           String?
+  costs                 ProductCost[]
+  requirements          ProductRequirement[]
+  steps                 ProductStep[]
+  isActive              Boolean              @default(true)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  deletedAt             DateTime?
+
+  leads              Lead[]
+  visaProfiles       VisaProfile[]
+  commissionPolicies CommissionPolicy[]
+  faqs               Faq[]
+  documents          KnowledgeDocument[]
+
+  @@unique([name, country])
+  @@index([categoryId])
+  @@index([country])
+  @@index([isActive])
+  @@map("products")
+}
+
+// =====================================================
+// 4. PARTNERS & CRM SYNC
+// =====================================================
+
+model Partner {
+  id                String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String         @unique @db.ObjectId
+  user              User           @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  partnerType       String
+  region            String?
+  contractStatus    ContractStatus @default(pending)
+  contractStartDate DateTime?
+  contractEndDate   DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  deletedAt         DateTime?
+
+  commissionPolicies CommissionPolicy[]
+  transactions       AccountingTransaction[]
+
+  @@index([partnerType])
+  @@index([region])
+  @@index([contractStatus])
+  @@map("partners")
+}
+
+model SchoolPartner {
+  id                String       @id @default(auto()) @map("_id") @db.ObjectId
+  schoolName        String
+  country           String
+  address           String?
+  contactPerson     String?
+  contactEmail      String?
+  contactPhone      String?
+  partnershipStatus CommonStatus @default(active)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  deletedAt         DateTime?
+
+  documents KnowledgeDocument[]
+
+  @@index([schoolName])
+  @@index([country])
+  @@index([partnershipStatus])
+  @@map("school_partners")
+}
+
+model CommissionPolicy {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  partnerId      String       @db.ObjectId
+  partner        Partner      @relation(fields: [partnerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  productId      String       @db.ObjectId
+  product        Product      @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ratePercentage Float        @default(0)
+  fixedAmount    Float        @default(0)
+  currency       String       @default("VND")
+  effectiveFrom  DateTime?
+  effectiveTo    DateTime?
+  status         CommonStatus @default(active)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([partnerId, productId])
+  @@index([partnerId])
+  @@index([productId])
+  @@map("commission_policies")
+}
+
+model CrmSyncLog {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  platform   String   @default("Bizfly")
+  entityType String
+  externalId String
+  localId    String   @db.ObjectId
+  syncStatus String
+  errorLog   String?
+  lastSyncAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@unique([platform, entityType, externalId])
+  @@index([entityType, localId])
+  @@index([syncStatus])
+  @@map("crm_sync_logs")
+}
+
+// =====================================================
+// 5. CUSTOMERS, LEADS & VISA PROFILES
+// =====================================================
+
+model Customer {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  fullName       String
+  phone          String
+  email          String?
+  dateOfBirth    DateTime?
+  gender         Gender?
+  address        String?
+  identityNumber String?
+  passportNumber String?
+  note           String?
+  createdById    String?   @db.ObjectId
+  createdBy      User?     @relation("CustomerCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  leads        Lead[]
+  visaProfiles VisaProfile[]
+  aiLogs       AiAssistantLog[]
+  transactions AccountingTransaction[]
+
+  @@index([phone])
+  @@index([email])
+  @@index([identityNumber])
+  @@index([passportNumber])
+  @@index([createdById])
+  @@map("customers")
+}
+
+model Lead {
+  id              String     @id @default(auto()) @map("_id") @db.ObjectId
+  customerId      String?    @db.ObjectId
+  customer        Customer?  @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bizflyContactId String?
+  fullname        String
+  phone           String
+  email           String?
+  source          String?
+  productId       String?    @db.ObjectId
+  product         Product?   @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  assignedToId    String?    @db.ObjectId
+  assignedTo      User?      @relation("LeadAssignedTo", fields: [assignedToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  status          LeadStatus @default(new)
+  lostReason      String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
+
+  visaProfiles VisaProfile[]
+
+  @@index([bizflyContactId])
+  @@index([customerId])
+  @@index([phone])
+  @@index([email])
+  @@index([productId])
+  @@index([assignedToId])
+  @@index([status])
+  @@map("leads")
+}
+
+model VisaProfile {
+  id                String              @id @default(auto()) @map("_id") @db.ObjectId
+  customerId        String              @db.ObjectId
+  customer          Customer            @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  leadId            String?             @db.ObjectId
+  lead              Lead?               @relation(fields: [leadId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  productId         String              @db.ObjectId
+  product           Product             @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  currentStepId     String?             @db.ObjectId
+  processingStaffId String?             @db.ObjectId
+  processingStaff   User?               @relation("VisaProcessingStaff", fields: [processingStaffId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  visaType          String
+  status            VisaProfileStatus   @default(processing)
+  submissionDate    DateTime?
+  resultDate        DateTime?
+  note              String?
+  taskChecklists    VisaTaskChecklist[]
+  documents         VisaDocumentItem[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  deletedAt         DateTime?
+
+  transactions AccountingTransaction[]
+
+  @@index([customerId])
+  @@index([leadId])
+  @@index([productId])
+  @@index([currentStepId])
+  @@index([processingStaffId])
+  @@index([status])
+  @@index([submissionDate])
+  @@map("visa_profiles")
+}
+
+// =====================================================
+// 6. MARKETING & CONTENT
+// =====================================================
+
+model NewsPost {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  title        String
+  slug         String     @unique
+  content      String
+  category     String
+  thumbnailUrl String?
+  status       PostStatus @default(draft)
+  authorId     String?    @db.ObjectId
+  author       User?      @relation("NewsAuthor", fields: [authorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  publishedAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  @@index([category])
+  @@index([status])
+  @@index([authorId])
+  @@index([publishedAt])
+  @@map("news_posts")
+}
+
+model Webinar {
+  id          String        @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime?
+  joinLink    String?
+  status      WebinarStatus @default(upcoming)
+  createdById String?       @db.ObjectId
+  createdBy   User?         @relation("WebinarCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+
+  @@index([startTime])
+  @@index([status])
+  @@index([createdById])
+  @@map("webinars")
+}
+
+model Faq {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  productId    String?  @db.ObjectId
+  product      Product? @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  question     String
+  answer       String
+  isFeatured   Boolean  @default(false)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([productId])
+  @@index([isFeatured])
+  @@map("faqs")
+}
+
+model HitoTip {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  title        String
+  content      String
+  iconType     String?
+  isActive     Boolean  @default(true)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("hito_tips")
+}
+
+// =====================================================
+// 7. KNOWLEDGE BASE & AI LOGS
+// =====================================================
+
+model DocumentCategory {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  name        String      @unique
+  accessLevel AccessLevel @default(internal)
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  documents KnowledgeDocument[]
+
+  @@map("document_categories")
+}
+
+model KnowledgeDocument {
+  id                 String           @id @default(auto()) @map("_id") @db.ObjectId
+  categoryId         String           @db.ObjectId
+  category           DocumentCategory @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  schoolId           String?          @db.ObjectId
+  school             SchoolPartner?   @relation(fields: [schoolId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  productId          String?          @db.ObjectId
+  product            Product?         @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  title              String
+  fileUrl            String
+  fileType           String?
+  isAiTrainingSource Boolean          @default(false)
+  uploadedById       String?          @db.ObjectId
+  uploadedBy         User?            @relation("DocumentUploadedBy", fields: [uploadedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  status             CommonStatus     @default(active)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  deletedAt          DateTime?
+
+  aiLogs   AiAssistantLog[] @relation("AiLogSources", fields: [aiLogIds], references: [id])
+  aiLogIds String[]         @db.ObjectId
+
+  @@index([categoryId])
+  @@index([schoolId])
+  @@index([productId])
+  @@index([uploadedById])
+  @@index([isAiTrainingSource])
+  @@index([status])
+  @@map("documents")
+}
+
+model AiAssistantLog {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String?   @db.ObjectId
+  user       User?     @relation("AiLogUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customerId String?   @db.ObjectId
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  userQuery  String
+  aiResponse String
+  createdAt  DateTime  @default(now())
+
+  sourceDocs   KnowledgeDocument[] @relation("AiLogSources", fields: [sourceDocIds], references: [id])
+  sourceDocIds String[]            @db.ObjectId
+
+  @@index([userId])
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("ai_assistant_logs")
+}
+
+// =====================================================
+// 8. BACK OFFICE
+// =====================================================
+
+model AccountingTransaction {
+  id              String                      @id @default(auto()) @map("_id") @db.ObjectId
+  type            AccountingTransactionType
+  amount          Float
+  currency        String                      @default("VND")
+  status          AccountingTransactionStatus @default(pending)
+  relatedUserId   String?                     @db.ObjectId
+  relatedUser     User?                       @relation("TransactionRelatedUser", fields: [relatedUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customerId      String?                     @db.ObjectId
+  customer        Customer?                   @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  visaProfileId   String?                     @db.ObjectId
+  visaProfile     VisaProfile?                @relation(fields: [visaProfileId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  partnerId       String?                     @db.ObjectId
+  partner         Partner?                    @relation(fields: [partnerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  referenceType   String?
+  referenceId     String?                     @db.ObjectId
+  transactionDate DateTime?
+  note            String?
+  createdById     String?                     @db.ObjectId
+  createdBy       User?                       @relation("TransactionCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  deletedAt       DateTime?
+
+  @@index([type])
+  @@index([status])
+  @@index([relatedUserId])
+  @@index([customerId])
+  @@index([visaProfileId])
+  @@index([partnerId])
+  @@index([transactionDate])
+  @@index([referenceType, referenceId])
+  @@index([createdById])
+  @@map("accounting_transactions")
+}
+
+model HrRecruitment {
+  id           String            @id @default(auto()) @map("_id") @db.ObjectId
+  positionName String
+  departmentId String?           @db.ObjectId
+  department   Department?       @relation(fields: [departmentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  status       RecruitmentStatus @default(open)
+  quantity     Int               @default(1)
+  description  String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  deletedAt    DateTime?
+
+  @@index([departmentId])
+  @@index([status])
+  @@map("hr_recruitment")
+}
