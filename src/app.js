@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
+const documentCategoryRoutes = require('./routes/documentCategory.routes');
+const documentRoutes = require('./routes/document.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 
 const app = express();
@@ -17,6 +19,12 @@ app.use('/api/v1/auth', authRoutes);
 
 // Khai báo định tuyến cho hệ thống quản lý Người dùng (Users)
 app.use('/api/v1/users', userRoutes);
+
+// Khai báo định tuyến cho hệ thống Danh mục Tài liệu (Document Categories)
+app.use('/api/v1/document-categories', documentCategoryRoutes);
+
+// Khai báo định tuyến cho hệ thống Tài liệu & Biểu mẫu (Documents)
+app.use('/api/v1/documents', documentRoutes);
 
 app.get('/', (req, res) => {
   res.json({
