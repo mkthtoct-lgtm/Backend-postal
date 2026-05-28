@@ -1,0 +1,57 @@
+const mongoose = require('mongoose');
+
+const userSchema = new mongoose.Schema(
+  {
+    fullName: {
+      type: String,
+      required: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+    passwordHash: {
+      type: String,
+      required: true,
+    },
+    phone: {
+      type: String,
+      default: null,
+    },
+    avatarUrl: {
+      type: String,
+      default: null,
+    },
+    roleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      // Giá trị ObjectId mặc định cho USER (có thể thay đổi sau nếu cần)
+      default: () => new mongoose.Types.ObjectId('60c72b2f9b1d8b2bad000001'),
+    },
+    departmentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    status: {
+      type: String,
+      enum: ['active', 'inactive', 'suspended'],
+      default: 'active',
+    },
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  {
+    timestamps: true, // Tự động quản lý createdAt và updatedAt
+  }
+);
+
+module.exports = mongoose.model('User', userSchema);
