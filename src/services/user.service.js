@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 
 class UserService {
@@ -26,6 +27,45 @@ class UserService {
   }
 
   /**
+   * Lấy danh sách người dùng có phân trang và tìm kiếm (loại trừ các bản ghi xóa mềm)
+   */
+  async findAll({ page = 1, limit = 10, search = '', status }) {
+    const filter = { deletedAt: null };
+
+    // Bộ lọc tìm kiếm theo từ khóa (tên hoặc email)
+    if (search) {
+      filter.$or = [
+        { fullName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    // Bộ lọc lọc theo trạng thái hoạt động
+    if (status) {
+      filter.status = status;
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      User.find(filter)
+        .select('-passwordHash') // Không trả về mật khẩu hash vì lý do bảo mật
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 }),
+      User.countDocuments(filter),
+    ]);
+
+    return {
+      users,
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
    * Tạo người dùng mới trong cơ sở dữ liệu
    * @param {Object} userData - Dữ liệu người dùng (fullName, email, passwordHash, roleId, departmentId, status)
    * @returns {Promise<Object>} Người dùng vừa được tạo
@@ -43,6 +83,32 @@ class UserService {
     });
 
     return await newUser.save();
+  }
+
+  async update(userId, updateData) {
+    const dataToUpdate = { ...updateData };
+
+    return await User.findOneAndUpdate(
+      { _id: userId, deletedAt: null },
+      { $set: dataToUpdate },
+      { returnDocument: 'after' }
+    ).select('-passwordHash');
+  }
+
+  /**
+   * Xóa mềm người dùng (chỉ ẩn bằng cách thiết lập deletedAt và đổi status thành inactive)
+   */
+  async softDelete(userId) {
+    return await User.findOneAndUpdate(
+      { _id: userId, deletedAt: null },
+      {
+        $set: {
+          deletedAt: new Date(),
+          status: 'inactive',
+        },
+      },
+      { returnDocument: 'after' }
+    ).select('-passwordHash');
   }
 
   /**
