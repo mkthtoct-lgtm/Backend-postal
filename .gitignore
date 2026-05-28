@@ -1,3 +1,10 @@
-echo "node_modules
+cat > .gitignore <<'EOF'
+node_modules
 .env
-.DS_Store" > .gitignore
+.env.*
+.DS_Store
+npm-debug.log
+yarn-error.log
+coverage
+dist
+EOF
