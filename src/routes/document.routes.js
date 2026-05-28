@@ -133,4 +133,134 @@ router.get('/', authMiddleware, documentController.getDocuments);
  */
 router.get('/:id', authMiddleware, documentController.getDocumentDetail);
 
+/**
+ * @swagger
+ * /documents:
+ *   post:
+ *     summary: Tạo tài liệu mới (Upload tài liệu từ Frontend)
+ *     tags: [Documents Management]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - categoryId
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Hướng dẫn đăng ký nghỉ phép năm
+ *               categoryId:
+ *                 type: string
+ *                 example: 664df001a1b2c3d4e5f60005
+ *               departmentId:
+ *                 type: string
+ *                 example: 60c72b2f9b1d8b2bad000005
+ *               schoolId:
+ *                 type: string
+ *               productId:
+ *                 type: string
+ *               fileUrl:
+ *                 type: string
+ *               fileType:
+ *                 type: string
+ *               isAiTrainingSource:
+ *                 type: boolean
+ *               status:
+ *                 type: string
+ *                 enum: [draft, pending, active, inactive]
+ *                 default: active
+ *               permissions:
+ *                 type: object
+ *     responses:
+ *       201:
+ *         description: Tạo tài liệu thành công
+ *       400:
+ *         description: Dữ liệu gửi lên không hợp lệ
+ *       401:
+ *         description: Chưa đăng nhập
+ */
+router.post('/', authMiddleware, documentController.createDocument);
+
+/**
+ * @swagger
+ * /documents/{id}:
+ *   patch:
+ *     summary: Cập nhật thông tin, trạng thái, hoặc phân quyền tài liệu
+ *     tags: [Documents Management]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Mongoose ID của tài liệu cần cập nhật
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               categoryId:
+ *                 type: string
+ *               departmentId:
+ *                 type: string
+ *               fileUrl:
+ *                 type: string
+ *               fileType:
+ *                 type: string
+ *               isAiTrainingSource:
+ *                 type: boolean
+ *               status:
+ *                 type: string
+ *               permissions:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Cập nhật thành công
+ *       400:
+ *         description: ID sai định dạng hoặc dữ liệu không hợp lệ
+ *       404:
+ *         description: Không tìm thấy tài liệu
+ *       401:
+ *         description: Chưa đăng nhập
+ */
+router.patch('/:id', authMiddleware, documentController.updateDocument);
+
+/**
+ * @swagger
+ * /documents/{id}:
+ *   delete:
+ *     summary: Xóa mềm tài liệu khỏi hệ thống
+ *     tags: [Documents Management]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Mongoose ID của tài liệu cần xóa
+ *     responses:
+ *       200:
+ *         description: Xóa tài liệu thành công
+ *       400:
+ *         description: ID sai định dạng
+ *       404:
+ *         description: Không tìm thấy tài liệu
+ *       401:
+ *         description: Chưa đăng nhập
+ */
+router.delete('/:id', authMiddleware, documentController.deleteDocument);
+
 module.exports = router;

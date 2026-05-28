@@ -29,9 +29,13 @@ class DocumentService {
     // Gán đồng thời cả 'categoryId' dạng string và đối tượng 'category' đầy đủ.
     const itemsMapped = documents.map(doc => {
       const docObj = doc.toObject();
-      if (docObj.categoryId && typeof docObj.categoryId === 'object') {
-        docObj.category = docObj.categoryId; // Gán đối tượng danh mục
-        docObj.categoryId = docObj.categoryId._id.toString(); // Chuyển categoryId về dạng chuỗi ID
+      if (docObj.categoryId) {
+        if (typeof docObj.categoryId === 'object' && docObj.categoryId._id) {
+          docObj.category = docObj.categoryId; // Gán đối tượng danh mục
+          docObj.categoryId = docObj.categoryId._id.toString(); // Chuyển categoryId về dạng chuỗi ID
+        } else {
+          docObj.categoryId = docObj.categoryId.toString();
+        }
       }
       return docObj;
     });
@@ -55,11 +59,86 @@ class DocumentService {
     if (!document) return null;
 
     const docObj = document.toObject();
-    if (docObj.categoryId && typeof docObj.categoryId === 'object') {
-      docObj.category = docObj.categoryId;
-      docObj.categoryId = docObj.categoryId._id.toString();
+    if (docObj.categoryId) {
+      if (typeof docObj.categoryId === 'object' && docObj.categoryId._id) {
+        docObj.category = docObj.categoryId;
+        docObj.categoryId = docObj.categoryId._id.toString();
+      } else {
+        docObj.categoryId = docObj.categoryId.toString();
+      }
     }
     return docObj;
+  }
+
+  /**
+   * Tạo tài liệu mới trong DB
+   * @param {Object} data - Dữ liệu tài liệu mới
+   * @returns {Promise<Object>} Tài liệu vừa tạo và populate đầy đủ
+   */
+  async create(data) {
+    const newDoc = new Document({
+      title: data.title,
+      categoryId: data.categoryId,
+      departmentId: data.departmentId || null,
+      schoolId: data.schoolId || null,
+      productId: data.productId || null,
+      fileUrl: data.fileUrl || '',
+      fileType: data.fileType || '',
+      isAiTrainingSource: data.isAiTrainingSource || false,
+      uploadedById: data.uploadedById || null,
+      status: data.status || 'active',
+      permissions: data.permissions || undefined,
+    });
+
+    const saved = await newDoc.save();
+    return await this.findById(saved._id);
+  }
+
+  /**
+   * Cập nhật thông tin tài liệu (metadata, status, permissions)
+   * @param {string} id - ID tài liệu cần cập nhật
+   * @param {Object} updateData - Dữ liệu cập nhật
+   * @returns {Promise<Object|null>} Tài liệu sau cập nhật
+   */
+  async update(id, updateData) {
+    const dataToUpdate = { ...updateData };
+
+    const updated = await Document.findOneAndUpdate(
+      { _id: id, deletedAt: null },
+      { $set: dataToUpdate },
+      { returnDocument: 'after' }
+    ).populate('categoryId');
+
+    if (!updated) return null;
+
+    const docObj = updated.toObject();
+    if (docObj.categoryId) {
+      if (typeof docObj.categoryId === 'object' && docObj.categoryId._id) {
+        docObj.category = docObj.categoryId;
+        docObj.categoryId = docObj.categoryId._id.toString();
+      } else {
+        docObj.categoryId = docObj.categoryId.toString();
+      }
+    }
+    return docObj;
+  }
+
+  /**
+   * Xóa mềm tài liệu
+   * @param {string} id - ID tài liệu
+   * @returns {Promise<Object|null>}
+   */
+  async softDelete(id) {
+    return await Document.findOneAndUpdate(
+      { _id: id, deletedAt: null },
+      {
+        $set: {
+          deletedAt: new Date(),
+          status: 'inactive',
+        },
+      },
+      { returnDocument: 'after' }
+    );
   }
 }
 
