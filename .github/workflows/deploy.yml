@@ -12,7 +12,7 @@ jobs:
     env:
       VPS_HOST: 14.225.254.185
       VPS_USER: root
-      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY || secrets.ACTION_SECRET }}
       VPS_PORT: 22
       VPS_PATH: /www/wwwroot/backend_09_Postal/Backend-postal
 
