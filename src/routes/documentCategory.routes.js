@@ -4,10 +4,12 @@ const authMiddleware = require('../middlewares/auth');
 
 const router = express.Router();
 
-// Middleware kiểm tra quyền Admin
+// Middleware kiểm tra quyền Admin hoặc Ban Giám Đốc
 const adminOnlyMiddleware = (req, res, next) => {
   const ADMIN_ROLE_ID = '69fc5af582ef85451120772a';
-  if (req.user && req.user.roleId === ADMIN_ROLE_ID) {
+  const BOARD_OF_DIRECTORS_ROLE_ID = '69fc5af582ef85451120772b';
+
+  if (req.user && (req.user.roleId === ADMIN_ROLE_ID || req.user.roleId === BOARD_OF_DIRECTORS_ROLE_ID)) {
     next();
   } else {
     return res.status(403).json({
