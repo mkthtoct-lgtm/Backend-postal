@@ -17,7 +17,7 @@ const env = {
     PASS: process.env.MAIL_PASS,
     FROM_NAME: process.env.MAIL_FROM_NAME || 'HITO CRM',
   },
-  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
+  FRONTEND_URL: process.env.FRONTEND_URL || 'https://hubportal-eight.vercel.app',
 };
 
 module.exports = env;
