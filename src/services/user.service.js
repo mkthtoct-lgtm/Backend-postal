@@ -29,7 +29,7 @@ class UserService {
   /**
    * Lấy danh sách người dùng có phân trang và tìm kiếm (loại trừ các bản ghi xóa mềm)
    */
-  async findAll({ page = 1, limit = 10, search = '', status }) {
+  async findAll({ page = 1, limit = 10, search = '', status, departmentId }) {
     const filter = { deletedAt: null };
 
     // Bộ lọc tìm kiếm theo từ khóa (tên hoặc email)
@@ -43,6 +43,17 @@ class UserService {
     // Bộ lọc lọc theo trạng thái hoạt động
     if (status) {
       filter.status = status;
+    }
+
+    // Bộ lọc theo phòng ban
+    if (departmentId) {
+      const mongoose = require('mongoose');
+      if (mongoose.Types.ObjectId.isValid(departmentId)) {
+        filter.departmentId = new mongoose.Types.ObjectId(departmentId);
+      } else {
+        // departmentId=null ⇒ lấy user chưa thuộc phòng ban nào
+        filter.departmentId = null;
+      }
     }
 
     const skip = (page - 1) * limit;
