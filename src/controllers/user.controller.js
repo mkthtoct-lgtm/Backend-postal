@@ -37,7 +37,7 @@ class UserController {
    */
   async getAllUsers(req, res) {
     try {
-      let { page, limit, search, status } = req.query;
+      let { page, limit, search, status, departmentId } = req.query;
 
       page = parseInt(page) || 1;
       limit = parseInt(limit) || 10;
@@ -51,7 +51,7 @@ class UserController {
         });
       }
 
-      const result = await userService.findAll({ page, limit, search, status });
+      const result = await userService.findAll({ page, limit, search, status, departmentId });
 
       return res.status(200).json({
         success: true,

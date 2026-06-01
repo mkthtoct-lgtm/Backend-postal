@@ -64,21 +64,12 @@ class ProductCategoryService {
   }
 
   /**
-   * Xóa mềm danh mục sản phẩm
+   * Xóa cứng danh mục sản phẩm khỏi database
    * @param {string} id - ID danh mục cần xóa
    * @returns {Promise<Object|null>}
    */
-  async softDelete(id) {
-    return await ProductCategory.findOneAndUpdate(
-      { _id: id, deletedAt: null },
-      {
-        $set: {
-          deletedAt: new Date(),
-          status: 'inactive',
-        },
-      },
-      { returnDocument: 'after' }
-    );
+  async hardDelete(id) {
+    return await ProductCategory.findByIdAndDelete(id);
   }
 }
 
