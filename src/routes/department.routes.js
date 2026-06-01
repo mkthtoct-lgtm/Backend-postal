@@ -1,7 +1,7 @@
 const express = require('express');
 const departmentController = require('../controllers/department.controller');
 const authMiddleware = require('../middlewares/auth');
-const managerOnly = require('../middlewares/managerOnly');
+const checkPermission = require('../middlewares/checkPermission');
 
 const router = express.Router();
 
@@ -50,7 +50,7 @@ const router = express.Router();
  *       401:
  *         description: Chưa đăng nhập hoặc token hết hạn
  */
-router.get('/', authMiddleware, departmentController.getAllDepartments);
+router.get('/', authMiddleware, checkPermission('departments:read'), departmentController.getAllDepartments);
 
 /**
  * @swagger
@@ -83,7 +83,7 @@ router.get('/', authMiddleware, departmentController.getAllDepartments);
  *       401:
  *         description: Chưa đăng nhập
  */
-router.post('/', authMiddleware, managerOnly, departmentController.createDepartment);
+router.post('/', authMiddleware, checkPermission('departments:write'), departmentController.createDepartment);
 
 /**
  * @swagger
@@ -123,7 +123,7 @@ router.post('/', authMiddleware, managerOnly, departmentController.createDepartm
  *       401:
  *         description: Chưa đăng nhập
  */
-router.patch('/:id', authMiddleware, managerOnly, departmentController.updateDepartment);
+router.patch('/:id', authMiddleware, checkPermission('departments:write'), departmentController.updateDepartment);
 
 /**
  * @swagger
@@ -150,6 +150,6 @@ router.patch('/:id', authMiddleware, managerOnly, departmentController.updateDep
  *       401:
  *         description: Chưa đăng nhập
  */
-router.delete('/:id', authMiddleware, managerOnly, departmentController.deleteDepartment);
+router.delete('/:id', authMiddleware, checkPermission('departments:write'), departmentController.deleteDepartment);
 
 module.exports = router;
