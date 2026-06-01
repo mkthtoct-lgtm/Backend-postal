@@ -72,6 +72,15 @@ class DepartmentController {
 
       const newDepartment = await departmentService.create({ name, description });
 
+      // Ghi lịch sử thao tác tạo phòng ban
+      const auditLogService = require('../services/auditLog.service');
+      auditLogService.log(
+        req.user.sub,
+        'department.create',
+        { type: 'department', id: newDepartment._id.toString(), name: newDepartment.name },
+        { name: newDepartment.name, description: newDepartment.description || '' }
+      );
+
       return res.status(201).json({
         success: true,
         message: 'Tạo phòng ban thành công.',
@@ -124,6 +133,15 @@ class DepartmentController {
 
       const updated = await departmentService.update(id, { name, description });
 
+      // Ghi lịch sử thao tác cập nhật phòng ban
+      const auditLogService = require('../services/auditLog.service');
+      auditLogService.log(
+        req.user.sub,
+        'department.update',
+        { type: 'department', id: updated._id.toString(), name: updated.name },
+        { name, description }
+      );
+
       return res.status(200).json({
         success: true,
         message: 'Cập nhật phòng ban thành công.',
@@ -163,6 +181,15 @@ class DepartmentController {
 
       // Ẩn phòng ban và reset departmentId của nhân sự về null
       await departmentService.hideDepartment(id);
+
+      // Ghi lịch sử thao tác ẩn phòng ban
+      const auditLogService = require('../services/auditLog.service');
+      auditLogService.log(
+        req.user.sub,
+        'department.update',
+        { type: 'department', id: department._id.toString(), name: department.name },
+        { isHidden: true }
+      );
 
       return res.status(200).json({
         success: true,

@@ -179,6 +179,30 @@ class UserController {
       const userObj = newUser.toObject();
       delete userObj.passwordHash;
 
+      // Ghi lịch sử tạo user (log dưới dạng user.update)
+      const auditLogService = require('../services/auditLog.service');
+      auditLogService.log(
+        req.user.sub,
+        'user.update',
+        { type: 'user', id: newUser._id.toString(), name: newUser.fullName },
+        { created: true, email: newUser.email, fullName: newUser.fullName }
+      );
+
+      // Nếu có gán phòng ban ngay khi tạo
+      if (cleanDepartmentId) {
+        const departmentService = require('../services/department.service');
+        departmentService.findById(cleanDepartmentId).then((dept) => {
+          if (dept) {
+            auditLogService.log(
+              req.user.sub,
+              'department.assign_user',
+              { type: 'department', id: dept._id.toString(), name: dept.name },
+              { userId: newUser._id.toString(), userName: newUser.fullName, userEmail: newUser.email }
+            );
+          }
+        }).catch((err) => console.error('Failed to log department.assign_user on user creation:', err));
+      }
+
       return res.status(201).json({
         success: true,
         message: 'Tạo tài khoản người dùng mới thành công.',
@@ -284,7 +308,57 @@ class UserController {
         updateData.email = cleanEmail;
       }
 
+      // So sánh sự thay đổi của departmentId
+      const oldDeptId = user.departmentId ? user.departmentId.toString() : null;
+      const newDeptId = updateData.departmentId !== undefined
+        ? (updateData.departmentId ? updateData.departmentId.toString() : null)
+        : oldDeptId;
+
       const updatedUser = await userService.update(id, updateData);
+
+      // Ghi lịch sử thao tác
+      const auditLogService = require('../services/auditLog.service');
+      
+      // 1. Ghi log cập nhật thông tin user chung
+      auditLogService.log(
+        req.user.sub,
+        'user.update',
+        { type: 'user', id: updatedUser._id.toString(), name: updatedUser.fullName },
+        { updatedFields: Object.keys(updateData) }
+      );
+
+      // 2. Ghi log điều động nhân sự phòng ban
+      if (oldDeptId !== newDeptId) {
+        const departmentService = require('../services/department.service');
+        
+        // Log gỡ khỏi phòng ban cũ
+        if (oldDeptId) {
+          departmentService.findById(oldDeptId).then((oldDept) => {
+            if (oldDept) {
+              auditLogService.log(
+                req.user.sub,
+                'department.remove_user',
+                { type: 'department', id: oldDept._id.toString(), name: oldDept.name },
+                { userId: updatedUser._id.toString(), userName: updatedUser.fullName, userEmail: updatedUser.email }
+              );
+            }
+          }).catch((err) => console.error('Failed to log department.remove_user:', err));
+        }
+
+        // Log thêm vào phòng ban mới
+        if (newDeptId) {
+          departmentService.findById(newDeptId).then((newDept) => {
+            if (newDept) {
+              auditLogService.log(
+                req.user.sub,
+                'department.assign_user',
+                { type: 'department', id: newDept._id.toString(), name: newDept.name },
+                { userId: updatedUser._id.toString(), userName: updatedUser.fullName, userEmail: updatedUser.email }
+              );
+            }
+          }).catch((err) => console.error('Failed to log department.assign_user:', err));
+        }
+      }
 
       return res.status(200).json({
         success: true,
@@ -334,6 +408,15 @@ class UserController {
 
       const updatedUser = await userService.update(id, { status });
 
+      // Ghi lịch sử đổi trạng thái hoạt động user
+      const auditLogService = require('../services/auditLog.service');
+      auditLogService.log(
+        req.user.sub,
+        'user.update',
+        { type: 'user', id: updatedUser._id.toString(), name: updatedUser.fullName },
+        { status }
+      );
+
       return res.status(200).json({
         success: true,
         message: status === 'active' ? 'Mở khóa tài khoản thành công.' : 'Khóa tài khoản thành công.',
@@ -373,6 +456,15 @@ class UserController {
 
       // Thực thi xóa mềm
       await userService.softDelete(id);
+
+      // Ghi lịch sử xóa mềm user
+      const auditLogService = require('../services/auditLog.service');
+      auditLogService.log(
+        req.user.sub,
+        'user.update',
+        { type: 'user', id: user._id.toString(), name: user.fullName },
+        { deleted: true }
+      );
 
       return res.status(200).json({
         success: true,
