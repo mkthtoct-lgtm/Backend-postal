@@ -6,6 +6,7 @@ const documentCategoryRoutes = require('./routes/documentCategory.routes');
 const documentRoutes = require('./routes/document.routes');
 const productCategoryRoutes = require('./routes/productCategory.routes');
 const departmentRoutes = require('./routes/department.routes');
+const auditLogRoutes = require('./routes/auditLog.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 
 const app = express();
@@ -33,6 +34,9 @@ app.use('/api/v1/product-categories', productCategoryRoutes);
 
 // Khai báo định tuyến cho hệ thống Phòng ban (Departments)
 app.use('/api/v1/departments', departmentRoutes);
+
+// Khai báo định tuyến cho hệ thống Lịch sử thao tác (Audit Logs)
+app.use('/api/v1/audit-logs', auditLogRoutes);
 
 app.get('/', (req, res) => {
   res.json({
