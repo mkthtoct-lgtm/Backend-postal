@@ -1,7 +1,7 @@
 const express = require('express');
 const auditLogController = require('../controllers/auditLog.controller');
 const authMiddleware = require('../middlewares/auth');
-const managerOnly = require('../middlewares/managerOnly');
+const checkPermission = require('../middlewares/checkPermission');
 
 const router = express.Router();
 
@@ -94,7 +94,7 @@ const router = express.Router();
  *       403:
  *         description: Không có quyền truy cập (Chỉ Admin hoặc Ban Giám Đốc)
  */
-router.get('/', authMiddleware, managerOnly, auditLogController.getAllLogs);
+router.get('/', authMiddleware, checkPermission('audit:read'), auditLogController.getAllLogs);
 
 /**
  * @swagger
@@ -134,6 +134,6 @@ router.get('/', authMiddleware, managerOnly, auditLogController.getAllLogs);
  *       403:
  *         description: Không có quyền truy cập
  */
-router.get('/actors', authMiddleware, managerOnly, auditLogController.getAllActors);
+router.get('/actors', authMiddleware, checkPermission('audit:read'), auditLogController.getAllActors);
 
 module.exports = router;
