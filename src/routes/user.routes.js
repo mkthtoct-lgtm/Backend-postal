@@ -1,7 +1,7 @@
 const express = require('express');
 const userController = require('../controllers/user.controller');
 const authMiddleware = require('../middlewares/auth');
-const managerOnly = require('../middlewares/managerOnly');
+const checkPermission = require('../middlewares/checkPermission');
 
 const router = express.Router();
 
@@ -80,7 +80,7 @@ const router = express.Router();
  *       401:
  *         description: Chưa đăng nhập hoặc token hết hạn
  */
-router.get('/', authMiddleware, userController.getAllUsers);
+router.get('/', authMiddleware, checkPermission('users:read'), userController.getAllUsers);
 
 /**
  * @swagger
@@ -107,7 +107,7 @@ router.get('/', authMiddleware, userController.getAllUsers);
  *       401:
  *         description: Chưa đăng nhập
  */
-router.get('/:id', authMiddleware, userController.getUserById);
+router.get('/:id', authMiddleware, checkPermission('users:read'), userController.getUserById);
 
 /**
  * @swagger
@@ -160,7 +160,7 @@ router.get('/:id', authMiddleware, userController.getUserById);
  *       401:
  *         description: Chưa đăng nhập
  */
-router.post('/', authMiddleware, managerOnly, userController.createUser);
+router.post('/', authMiddleware, checkPermission('users:write'), userController.createUser);
 
 /**
  * @swagger
@@ -256,8 +256,8 @@ router.post('/', authMiddleware, managerOnly, userController.createUser);
  *       401:
  *         description: Chưa đăng nhập
  */
-router.put('/:id', authMiddleware, managerOnly, userController.updateUser);
-router.patch('/:id', authMiddleware, managerOnly, userController.updateUser);
+router.put('/:id', authMiddleware, checkPermission('users:write'), userController.updateUser);
+router.patch('/:id', authMiddleware, checkPermission('users:write'), userController.updateUser);
 
 
 /**
@@ -298,7 +298,7 @@ router.patch('/:id', authMiddleware, managerOnly, userController.updateUser);
  *       401:
  *         description: Chưa đăng nhập
  */
-router.patch('/:id/status', authMiddleware, managerOnly, userController.updateUserStatus);
+router.patch('/:id/status', authMiddleware, checkPermission('users:write'), userController.updateUserStatus);
 
 /**
  * @swagger
@@ -325,6 +325,6 @@ router.patch('/:id/status', authMiddleware, managerOnly, userController.updateUs
  *       401:
  *         description: Chưa đăng nhập
  */
-router.delete('/:id', authMiddleware, managerOnly, userController.deleteUser);
+router.delete('/:id', authMiddleware, checkPermission('users:write'), userController.deleteUser);
 
 module.exports = router;
