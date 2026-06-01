@@ -116,7 +116,7 @@ class ProductCategoryController {
   }
 
   /**
-   * Xóa mềm danh mục sản phẩm
+   * Xóa cứng danh mục sản phẩm khỏi database
    */
   async deleteCategory(req, res) {
     try {
@@ -133,11 +133,12 @@ class ProductCategoryController {
       if (!category) {
         return res.status(404).json({
           success: false,
-          message: 'Danh mục sản phẩm không tồn tại hoặc đã được xóa trước đó.',
+          message: 'Danh mục sản phẩm không tồn tại.',
         });
       }
 
-      await productCategoryService.softDelete(id);
+      // Xóa cứng khỏi database
+      await productCategoryService.hardDelete(id);
 
       return res.status(200).json({
         success: true,
