@@ -95,6 +95,15 @@ class AuthController {
       // Phát hành bộ token
       const result = await authService.login(authenticatedUser);
 
+      // Ghi lịch sử thao tác đăng nhập
+      const auditLogService = require('../services/auditLog.service');
+      auditLogService.log(
+        authenticatedUser.id,
+        'auth.login',
+        { type: 'user', id: authenticatedUser.id, name: authenticatedUser.fullName },
+        { ip: req.ip || req.connection?.remoteAddress || 'Unknown', device: req.headers['user-agent'] || 'Unknown' }
+      );
+
       return res.status(200).json({
         success: true,
         message: 'Đăng nhập hệ thống thành công.',
