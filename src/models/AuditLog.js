@@ -35,4 +35,7 @@ const auditLogSchema = new mongoose.Schema(
   }
 );
 
+// Thiết lập index TTL: Tự động xóa các bản ghi log cũ hơn 30 ngày để tránh làm nặng database
+auditLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+
 module.exports = mongoose.model('AuditLog', auditLogSchema);
