@@ -1,6 +1,7 @@
 const express = require('express');
 const userController = require('../controllers/user.controller');
 const authMiddleware = require('../middlewares/auth');
+const managerOnly = require('../middlewares/managerOnly');
 
 const router = express.Router();
 
@@ -159,7 +160,7 @@ router.get('/:id', authMiddleware, userController.getUserById);
  *       401:
  *         description: Chưa đăng nhập
  */
-router.post('/', authMiddleware, userController.createUser);
+router.post('/', authMiddleware, managerOnly, userController.createUser);
 
 /**
  * @swagger
@@ -255,8 +256,8 @@ router.post('/', authMiddleware, userController.createUser);
  *       401:
  *         description: Chưa đăng nhập
  */
-router.put('/:id', authMiddleware, userController.updateUser);
-router.patch('/:id', authMiddleware, userController.updateUser);
+router.put('/:id', authMiddleware, managerOnly, userController.updateUser);
+router.patch('/:id', authMiddleware, managerOnly, userController.updateUser);
 
 
 /**
@@ -297,7 +298,7 @@ router.patch('/:id', authMiddleware, userController.updateUser);
  *       401:
  *         description: Chưa đăng nhập
  */
-router.patch('/:id/status', authMiddleware, userController.updateUserStatus);
+router.patch('/:id/status', authMiddleware, managerOnly, userController.updateUserStatus);
 
 /**
  * @swagger
@@ -324,6 +325,6 @@ router.patch('/:id/status', authMiddleware, userController.updateUserStatus);
  *       401:
  *         description: Chưa đăng nhập
  */
-router.delete('/:id', authMiddleware, userController.deleteUser);
+router.delete('/:id', authMiddleware, managerOnly, userController.deleteUser);
 
 module.exports = router;
