@@ -21,8 +21,66 @@ const rolesToSeed = [
       'documents:read',
       'documents:write',
       'audit:read',
+      'notifications:read',
+      'notifications:write',
     ],
-    description: 'Ban giám đốc, có quyền quản trị nghiệp vụ và xem nhật ký thao tác.',
+    description: 'Ban giám đốc, có quyền quản trị nghiệp vụ, xem nhật ký thao tác và đăng thông báo.',
+  },
+  {
+    _id: new mongoose.Types.ObjectId('69fc5af582ef85451120772c'),
+    name: 'Trưởng bộ phận',
+    slug: 'truongbophan',
+    permissions: [
+      'departments:read',
+      'users:read',
+      'documents:read',
+      'documents:write',
+      'notifications:read',
+      'notifications:write',
+    ],
+    description: 'Trưởng bộ phận quản lý phòng ban chuyên môn và đăng thông báo.',
+  },
+  {
+    _id: new mongoose.Types.ObjectId('69fc5af582ef85451120772d'),
+    name: 'Nhân sự',
+    slug: 'nhansu',
+    permissions: [
+      'departments:read',
+      'users:read',
+      'documents:read',
+      'notifications:read',
+    ],
+    description: 'Bộ phận Nhân sự hỗ trợ vận hành và nhận thông báo.',
+  },
+  {
+    _id: new mongoose.Types.ObjectId('69fc5af582ef85451120772e'),
+    name: 'Đại lý',
+    slug: 'daily',
+    permissions: [
+      'documents:read',
+      'notifications:read',
+    ],
+    description: 'Hệ thống đại lý phân phối, được nhận thông báo.',
+  },
+  {
+    _id: new mongoose.Types.ObjectId('69fc5af682ef85451120772f'),
+    name: 'Cộng tác viên',
+    slug: 'congtacvien',
+    permissions: [
+      'documents:read',
+      'notifications:read',
+    ],
+    description: 'Cộng tác viên tự do, được nhận thông báo.',
+  },
+  {
+    _id: new mongoose.Types.ObjectId('69fc5af782ef854511207730'),
+    name: 'Người dùng',
+    slug: 'user',
+    permissions: [
+      'documents:read',
+      'notifications:read',
+    ],
+    description: 'Người dùng/Khách hàng thông thường.',
   },
   {
     _id: new mongoose.Types.ObjectId('60c72b2f9b1d8b2bad000001'),
@@ -33,8 +91,9 @@ const rolesToSeed = [
       'users:read',
       'documents:read',
       'documents:download',
+      'notifications:read',
     ],
-    description: 'Nhân viên thông thường, chỉ được phép xem thông tin và tải tài liệu.',
+    description: 'Nhân viên thông thường, chỉ được phép xem thông tin, tải tài liệu và nhận thông báo.',
   },
 ];
 
@@ -48,18 +107,18 @@ const seedRoles = async () => {
     for (const roleData of rolesToSeed) {
       // Thực thi upsert (nếu chưa có thì tạo mới, có rồi thì cập nhật lại quyền hạn mới nhất)
       await Role.findByIdAndUpdate(
-        roleData._id,
-        {
-          name: roleData.name,
-          slug: roleData.slug,
-          permissions: roleData.permissions,
-          description: roleData.description,
-        },
-        { upsert: true, new: true }
+          roleData._id,
+          {
+            name: roleData.name,
+            slug: roleData.slug,
+            permissions: roleData.permissions,
+            description: roleData.description,
+          },
+          { upsert: true, new: true }
       );
     }
     
-    console.log('[RoleSeeder] Đồng bộ thành công 3 vai trò mặc định (Admin, Ban Giám Đốc, Nhân Viên).');
+    console.log('[RoleSeeder] Đồng bộ thành công toàn bộ vai trò mặc định.');
   } catch (error) {
     console.error('[RoleSeeder Error] Lỗi khi đồng bộ vai trò:', error.message);
   }
