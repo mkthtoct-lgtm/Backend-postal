@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const documentCategoryRoutes = require('./routes/documentCategory.routes');
@@ -7,12 +8,16 @@ const documentRoutes = require('./routes/document.routes');
 const productCategoryRoutes = require('./routes/productCategory.routes');
 const departmentRoutes = require('./routes/department.routes');
 const auditLogRoutes = require('./routes/auditLog.routes');
+const notificationRoutes = require('./routes/notification.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Cấu hình phục vụ file tĩnh vật lý từ thư mục /uploads
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Khai báo giao diện tài liệu API (Swagger UI)
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
@@ -37,6 +42,9 @@ app.use('/api/v1/departments', departmentRoutes);
 
 // Khai báo định tuyến cho hệ thống Lịch sử thao tác (Audit Logs)
 app.use('/api/v1/audit-logs', auditLogRoutes);
+
+// Khai báo định tuyến cho hệ thống Thông báo nội bộ (Notifications)
+app.use('/api/v1/notifications', notificationRoutes);
 
 app.get('/', (req, res) => {
   res.json({

@@ -1,6 +1,7 @@
 const express = require('express');
 const documentController = require('../controllers/document.controller');
 const authMiddleware = require('../middlewares/auth');
+const upload = require('../middlewares/upload');
 
 const router = express.Router();
 
@@ -262,5 +263,83 @@ router.patch('/:id', authMiddleware, documentController.updateDocument);
  *         description: Chưa đăng nhập
  */
 router.delete('/:id', authMiddleware, documentController.deleteDocument);
+
+/**
+ * @swagger
+ * /documents/upload:
+ *   post:
+ *     summary: Tải file vật lý lên máy chủ
+ *     tags: [Documents Management]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - file
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Tệp tin cần tải lên (PDF, Word, Excel, Slide, Image, v.v...)
+ *     responses:
+ *       200:
+ *         description: Tải file lên máy chủ thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Tải file lên máy chủ thành công.
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     fileUrl:
+ *                       type: string
+ *                       example: /uploads/17154238-file.pdf
+ *                     fileType:
+ *                       type: string
+ *                       example: pdf
+ *                     fileName:
+ *                       type: string
+ *                       example: file.pdf
+ *       400:
+ *         description: Vui lòng cung cấp file cần tải lên
+ *       401:
+ *         description: Chưa đăng nhập hoặc token không hợp lệ
+ *       500:
+ *         description: Lỗi máy chủ khi tải file
+ */
+router.post('/upload', authMiddleware, upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp file cần tải lên.' });
+    }
+
+    // Trả về đường dẫn tĩnh của file trên server (ví dụ: /uploads/17154238-file.pdf)
+    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileType = req.file.originalname.split('.').pop().toLowerCase();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Tải file lên máy chủ thành công.',
+      data: {
+        fileUrl,
+        fileType,
+        fileName: req.file.originalname
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Lỗi máy chủ khi tải file.', error: error.message });
+  }
+});
 
 module.exports = router;
