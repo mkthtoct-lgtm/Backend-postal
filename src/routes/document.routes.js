@@ -2,6 +2,15 @@ const express = require('express');
 const documentController = require('../controllers/document.controller');
 const authMiddleware = require('../middlewares/auth');
 const upload = require('../middlewares/upload');
+const multer = require('multer');
+const googleDriveService = require('../services/googleDrive.service');
+
+// Cấu hình lưu trữ bộ nhớ RAM tạm thời phục vụ tải lên Google Drive
+const storage = multer.memoryStorage();
+const uploadMem = multer({
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+});
 
 const router = express.Router();
 
@@ -268,7 +277,7 @@ router.delete('/:id', authMiddleware, documentController.deleteDocument);
  * @swagger
  * /documents/upload:
  *   post:
- *     summary: Tải file vật lý lên máy chủ
+ *     summary: Tải file lên Google Drive
  *     tags: [Documents Management]
  *     security:
  *       - BearerAuth: []
@@ -318,27 +327,30 @@ router.delete('/:id', authMiddleware, documentController.deleteDocument);
  *       500:
  *         description: Lỗi máy chủ khi tải file
  */
-router.post('/upload', authMiddleware, upload.single('file'), (req, res) => {
+router.post('/upload', authMiddleware, uploadMem.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp file cần tải lên.' });
     }
 
-    // Trả về đường dẫn tĩnh của file trên server (ví dụ: /uploads/17154238-file.pdf)
-    const fileUrl = `/uploads/${req.file.filename}`;
-    const fileType = req.file.originalname.split('.').pop().toLowerCase();
+    // Tải file trực tiếp lên Google Drive
+    const uploadResult = await googleDriveService.uploadFile(req.file);
 
     return res.status(200).json({
       success: true,
-      message: 'Tải file lên máy chủ thành công.',
+      message: 'Tải file lên Google Drive thành công.',
       data: {
-        fileUrl,
-        fileType,
+        fileUrl: uploadResult.webViewLink,
+        fileType: req.file.originalname.split('.').pop().toLowerCase(),
         fileName: req.file.originalname
       }
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: 'Lỗi máy chủ khi tải file.', error: error.message });
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Lỗi máy chủ khi tải file lên Google Drive.', 
+      error: error.message 
+    });
   }
 });
 
