@@ -15,16 +15,27 @@ const swaggerOptions = {
         email: 'support@hito.vn',
       },
     },
-    servers: [
-      {
-        url: `http://localhost:${env.PORT}/api/v1`,
-        description: 'Máy chủ thử nghiệm (Local Development Server)',
-      },
-      {
-        url: `https://api.hto.edu.vn/api/v1`,
-        description: 'Máy chủ chính thức (Production VPS)',
-      },
-    ],
+    servers: env.NODE_ENV === 'production'
+      ? [
+          {
+            url: `https://api.hto.edu.vn/api/v1`,
+            description: 'Máy chủ chính thức (Production VPS)',
+          },
+          {
+            url: `http://localhost:${env.PORT}/api/v1`,
+            description: 'Máy chủ thử nghiệm (Local Development Server)',
+          },
+        ]
+      : [
+          {
+            url: `http://localhost:${env.PORT}/api/v1`,
+            description: 'Máy chủ thử nghiệm (Local Development Server)',
+          },
+          {
+            url: `https://api.hto.edu.vn/api/v1`,
+            description: 'Máy chủ chính thức (Production VPS)',
+          },
+        ],
     components: {
       securitySchemes: {
         BearerAuth: {
