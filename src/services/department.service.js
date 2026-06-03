@@ -109,21 +109,7 @@ class DepartmentService {
     );
   }
 
-  /**
-   * Ẩn phòng ban (soft delete) và reset departmentId của tất cả User thuộc phòng ban về null
-   * @param {string} id - ID phòng ban cần ẩn
-   * @returns {Promise<Object|null>} Phòng ban đã ẩn
-   */
-  async hideDepartment(id) {
-    // Ẩn phòng ban
-    const hidden = await Department.findOneAndUpdate(
-      { _id: id, isHidden: false },
-      { $set: { isHidden: true } },
-      { returnDocument: 'after' }
-    );
 
-    return hidden;
-  }
 
   /**
    * Đảo ngược trạng thái hiển thị của phòng ban (Bật/Tắt ẩn)
