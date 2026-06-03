@@ -1,5 +1,28 @@
 const mongoose = require('mongoose');
 const documentService = require('../services/document.service');
+const Role = require('../models/Role');
+
+/**
+ * Phân nhóm người dùng dựa trên vai trò để kiểm duyệt quyền tài liệu (quy chuẩn tương thích Frontend)
+ */
+const getUserGroupIds = (roleSlug) => {
+  const groups = ['all'];
+  const normRole = roleSlug === 'board_of_directors' ? 'bangiamdoc' : roleSlug;
+
+  if (['admin', 'bangiamdoc', 'board_of_directors', 'truongbophan', 'nhansu', 'user', 'staff'].includes(normRole)) {
+    groups.push('internal');
+  }
+
+  if (['daily', 'congtacvien'].includes(normRole)) {
+    groups.push('partner');
+  }
+
+  if (['admin', 'bangiamdoc', 'board_of_directors', 'truongbophan'].includes(normRole)) {
+    groups.push('manager');
+  }
+
+  return groups;
+};
 
 class DocumentController {
   /**
@@ -20,7 +43,26 @@ class DocumentController {
         });
       }
 
-      const result = await documentService.findAndCount({ page, limit, categoryId });
+      // Lấy vai trò và phòng ban của user đang đăng nhập
+      let roleSlug = '';
+      let departmentId = null;
+      if (req.user) {
+        departmentId = req.user.departmentId;
+        if (req.user.roleId) {
+          const role = await Role.findById(req.user.roleId);
+          if (role) {
+            roleSlug = role.slug;
+          }
+        }
+      }
+
+      const result = await documentService.findAndCount({ 
+        page, 
+        limit, 
+        categoryId, 
+        roleSlug, 
+        departmentId 
+      });
 
       return res.status(200).json({
         success: true,
@@ -57,6 +99,34 @@ class DocumentController {
           success: false,
           message: 'Tài liệu không tồn tại hoặc đã bị xóa mềm.',
         });
+      }
+
+      // Kiểm tra quyền xem tài liệu của user đăng nhập
+      if (req.user) {
+        let roleSlug = '';
+        if (req.user.roleId) {
+          const role = await Role.findById(req.user.roleId);
+          if (role) {
+            roleSlug = role.slug;
+          }
+        }
+
+        if (roleSlug !== 'admin') {
+          const userGroups = getUserGroupIds(roleSlug);
+          const permissions = document.permissions || {};
+          const viewRule = permissions.view || { groups: ['all'], roles: [], departments: [] };
+
+          const hasGroup = viewRule.groups && viewRule.groups.some(g => userGroups.includes(g));
+          const hasRole = viewRule.roles && viewRule.roles.includes(roleSlug);
+          const hasDept = req.user.departmentId && viewRule.departments && viewRule.departments.includes(req.user.departmentId.toString());
+
+          if (!hasGroup && !hasRole && !hasDept) {
+            return res.status(403).json({
+              success: false,
+              message: 'Bạn không có quyền xem chi tiết tài liệu này.',
+            });
+          }
+        }
       }
 
       return res.status(200).json({
@@ -158,6 +228,34 @@ class DocumentController {
         });
       }
 
+      // Kiểm tra quyền chỉnh sửa tài liệu
+      if (req.user) {
+        let roleSlug = '';
+        if (req.user.roleId) {
+          const role = await Role.findById(req.user.roleId);
+          if (role) {
+            roleSlug = role.slug;
+          }
+        }
+
+        if (roleSlug !== 'admin') {
+          const userGroups = getUserGroupIds(roleSlug);
+          const docPermissions = existingDoc.permissions || {};
+          const editRule = docPermissions.edit || { groups: ['manager'], roles: ['admin', 'truongbophan'], departments: [] };
+
+          const hasGroup = editRule.groups && editRule.groups.some(g => userGroups.includes(g));
+          const hasRole = editRule.roles && editRule.roles.includes(roleSlug);
+          const hasDept = req.user.departmentId && editRule.departments && editRule.departments.includes(req.user.departmentId.toString());
+
+          if (!hasGroup && !hasRole && !hasDept) {
+            return res.status(403).json({
+              success: false,
+              message: 'Bạn không có quyền chỉnh sửa tài liệu này.',
+            });
+          }
+        }
+      }
+
       const updateData = {};
       if (title !== undefined) updateData.title = title.trim();
       if (fileUrl !== undefined) updateData.fileUrl = fileUrl.trim();
@@ -228,6 +326,34 @@ class DocumentController {
           success: false,
           message: 'Tài liệu không tồn tại hoặc đã bị xóa trước đó.',
         });
+      }
+
+      // Kiểm tra quyền xóa tài liệu
+      if (req.user) {
+        let roleSlug = '';
+        if (req.user.roleId) {
+          const role = await Role.findById(req.user.roleId);
+          if (role) {
+            roleSlug = role.slug;
+          }
+        }
+
+        if (roleSlug !== 'admin') {
+          const userGroups = getUserGroupIds(roleSlug);
+          const docPermissions = existingDoc.permissions || {};
+          const editRule = docPermissions.edit || { groups: ['manager'], roles: ['admin', 'truongbophan'], departments: [] };
+
+          const hasGroup = editRule.groups && editRule.groups.some(g => userGroups.includes(g));
+          const hasRole = editRule.roles && editRule.roles.includes(roleSlug);
+          const hasDept = req.user.departmentId && editRule.departments && editRule.departments.includes(req.user.departmentId.toString());
+
+          if (!hasGroup && !hasRole && !hasDept) {
+            return res.status(403).json({
+              success: false,
+              message: 'Bạn không có quyền xóa tài liệu này.',
+            });
+          }
+        }
       }
 
       await documentService.softDelete(id);
