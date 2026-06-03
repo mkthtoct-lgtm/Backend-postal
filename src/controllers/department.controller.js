@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const departmentService = require('../services/department.service');
+const Role = require('../models/Role');
 
 // Hàm helper chuẩn hóa department document thành response FE mong đợi
 const formatDepartment = (dept) => {
@@ -16,7 +17,15 @@ class DepartmentController {
    */
   async getAllDepartments(req, res) {
     try {
-      const departments = await departmentService.findAll();
+      let includeHidden = false;
+      if (req.query.includeHidden === 'true' && req.user) {
+        const role = await Role.findById(req.user.roleId);
+        if (role && (role.slug === 'admin' || role.slug === 'board_of_directors')) {
+          includeHidden = true;
+        }
+      }
+
+      const departments = await departmentService.findAll(includeHidden);
 
       return res.status(200).json({
         success: true,
@@ -179,7 +188,7 @@ class DepartmentController {
         });
       }
 
-      // Ẩn phòng ban và reset departmentId của nhân sự về null
+      // Ẩn phòng ban
       await departmentService.hideDepartment(id);
 
       // Ghi lịch sử thao tác ẩn phòng ban
@@ -193,13 +202,61 @@ class DepartmentController {
 
       return res.status(200).json({
         success: true,
-        message: 'Phòng ban đã được ẩn. Nhân sự thuộc phòng ban này đã được gỡ khỏi phòng ban.',
+        message: 'Phòng ban đã được ẩn thành công.',
       });
     } catch (error) {
       console.error('Error in deleteDepartment:', error);
       return res.status(500).json({
         success: false,
         message: 'Lỗi máy chủ khi ẩn phòng ban.',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Đảo ngược trạng thái hiển thị (Bật/Tắt ẩn) của phòng ban (chỉ Admin)
+   */
+  async toggleVisibility(req, res) {
+    try {
+      const { id } = req.params;
+
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID phòng ban không hợp lệ.',
+        });
+      }
+
+      const updated = await departmentService.toggleVisibility(id);
+      if (!updated) {
+        return res.status(404).json({
+          success: false,
+          message: 'Phòng ban không tồn tại.',
+        });
+      }
+
+      // Ghi lịch sử thao tác
+      const auditLogService = require('../services/auditLog.service');
+      auditLogService.log(
+        req.user.sub,
+        'department.update',
+        { type: 'department', id: updated._id.toString(), name: updated.name },
+        { isHidden: updated.isHidden }
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: updated.isHidden
+          ? 'Đã ẩn phòng ban thành công.'
+          : 'Đã hiển thị phòng ban thành công.',
+        data: formatDepartment(updated),
+      });
+    } catch (error) {
+      console.error('Error in toggleVisibility:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi cập nhật trạng thái hiển thị phòng ban.',
         error: error.message,
       });
     }
