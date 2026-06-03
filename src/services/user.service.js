@@ -29,7 +29,7 @@ class UserService {
   /**
    * Lấy danh sách người dùng có phân trang và tìm kiếm (loại trừ các bản ghi xóa mềm)
    */
-  async findAll({ page = 1, limit = 10, search = '', status, departmentId }) {
+  async findAll({ search = '', status, departmentId } = {}) {
     const filter = { deletedAt: null };
 
     // Bộ lọc tìm kiếm theo từ khóa (tên hoặc email)
@@ -56,29 +56,13 @@ class UserService {
       }
     }
 
-    const isUnlimited = limit === -1 || limit === 'all';
-    const total = await User.countDocuments(filter);
-
-    let users;
-    if (isUnlimited) {
-      users = await User.find(filter)
-        .select('-passwordHash')
-        .sort({ createdAt: -1 });
-    } else {
-      const skip = (page - 1) * limit;
-      users = await User.find(filter)
-        .select('-passwordHash')
-        .skip(skip)
-        .limit(limit)
-        .sort({ createdAt: -1 });
-    }
+    const users = await User.find(filter)
+      .select('-passwordHash')
+      .sort({ createdAt: -1 });
 
     return {
       users,
-      total,
-      page: isUnlimited ? 1 : page,
-      limit: isUnlimited ? total : limit,
-      pages: isUnlimited ? 1 : Math.ceil(total / limit),
+      total: users.length,
     };
   }
 
