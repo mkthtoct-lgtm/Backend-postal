@@ -125,32 +125,7 @@ router.post('/', authMiddleware, checkPermission('departments:write'), departmen
  */
 router.patch('/:id', authMiddleware, checkPermission('departments:write'), departmentController.updateDepartment);
 
-/**
- * @swagger
- * /departments/{id}:
- *   delete:
- *     summary: Ẩn phòng ban và gỡ nhân sự khỏi phòng ban (chỉ Admin)
- *     tags: [Departments]
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Mongoose ID của phòng ban cần ẩn
- *     responses:
- *       200:
- *         description: Ẩn phòng ban thành công
- *       400:
- *         description: ID không hợp lệ
- *       404:
- *         description: Phòng ban không tồn tại
- *       401:
- *         description: Chưa đăng nhập
- */
-router.delete('/:id', authMiddleware, checkPermission('departments:write'), departmentController.deleteDepartment);
+
 
 /**
  * @swagger

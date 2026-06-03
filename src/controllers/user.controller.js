@@ -379,7 +379,7 @@ class UserController {
     try {
       const { id } = req.params;
       const { status } = req.body;
-
+      
       // Kiểm tra định dạng ObjectId
       if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({
