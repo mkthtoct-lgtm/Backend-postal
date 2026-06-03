@@ -40,7 +40,14 @@ class UserController {
       let { page, limit, search, status, departmentId } = req.query;
 
       page = parseInt(page) || 1;
-      limit = parseInt(limit) || 10;
+      
+      let parsedLimit;
+      if (limit === 'all' || limit === '-1' || limit === 'none') {
+        parsedLimit = 'all';
+      } else {
+        parsedLimit = parseInt(limit) || 10;
+      }
+      
       search = search ? search.trim() : '';
 
       // Kiểm soát giá trị lọc status hợp lệ
@@ -51,7 +58,7 @@ class UserController {
         });
       }
 
-      const result = await userService.findAll({ page, limit, search, status, departmentId });
+      const result = await userService.findAll({ page, limit: parsedLimit, search, status, departmentId });
 
       return res.status(200).json({
         success: true,
