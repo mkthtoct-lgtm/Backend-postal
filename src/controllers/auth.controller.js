@@ -76,6 +76,43 @@ class AuthController {
   }
 
   /**
+   * Cập nhật thông tin bổ sung sau khi đăng ký thành công (Register Profile)
+   */
+  async registerProfile(req, res) {
+    try {
+      const { userId, phone, socialLink, city, ward, addressDetail, referralCode } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Thiếu userId người dùng cần cập nhật thông tin.',
+        });
+      }
+
+      const updatedUser = await authService.registerProfile({
+        userId,
+        phone,
+        socialLink,
+        city,
+        ward,
+        addressDetail,
+        referralCode,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Bổ sung thông tin tài khoản thành công.',
+        data: updatedUser,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || 'Lỗi xảy ra trong quá trình bổ sung thông tin.',
+      });
+    }
+  }
+
+  /**
    * Đăng nhập người dùng (Login)
    */
   async login(req, res) {
