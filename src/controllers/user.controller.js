@@ -381,7 +381,7 @@ class UserController {
       const { status } = req.body;
 
       // Kiểm tra định dạng ObjectId
-      if (!mongoose.Types.ObjectId.isVad(id)) {
+      if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({
           success: false,
           message: 'ID người dùng không hợp lệ.',
