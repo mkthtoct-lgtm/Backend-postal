@@ -1,6 +1,7 @@
 const express = require('express');
 const documentController = require('../controllers/document.controller');
 const authMiddleware = require('../middlewares/auth');
+const checkPermission = require('../middlewares/checkPermission');
 const upload = require('../middlewares/upload');
 const multer = require('multer');
 const googleDriveService = require('../services/googleDrive.service');
@@ -114,7 +115,7 @@ const router = express.Router();
  *       401:
  *         description: Chưa đăng nhập hoặc token không hợp lệ
  */
-router.get('/', authMiddleware, documentController.getDocuments);
+router.get('/', authMiddleware, checkPermission('documents:read'), documentController.getDocuments);
 
 /**
  * @swagger
@@ -141,7 +142,7 @@ router.get('/', authMiddleware, documentController.getDocuments);
  *       401:
  *         description: Chưa đăng nhập
  */
-router.get('/:id', authMiddleware, documentController.getDocumentDetail);
+router.get('/:id', authMiddleware, checkPermission('documents:read'), documentController.getDocumentDetail);
 
 /**
  * @swagger
@@ -194,7 +195,7 @@ router.get('/:id', authMiddleware, documentController.getDocumentDetail);
  *       401:
  *         description: Chưa đăng nhập
  */
-router.post('/', authMiddleware, documentController.createDocument);
+router.post('/', authMiddleware, checkPermission('documents:write'), documentController.createDocument);
 
 /**
  * @swagger
@@ -244,7 +245,7 @@ router.post('/', authMiddleware, documentController.createDocument);
  *       401:
  *         description: Chưa đăng nhập
  */
-router.patch('/:id', authMiddleware, documentController.updateDocument);
+router.patch('/:id', authMiddleware, checkPermission('documents:write'), documentController.updateDocument);
 
 /**
  * @swagger
@@ -271,7 +272,7 @@ router.patch('/:id', authMiddleware, documentController.updateDocument);
  *       401:
  *         description: Chưa đăng nhập
  */
-router.delete('/:id', authMiddleware, documentController.deleteDocument);
+router.delete('/:id', authMiddleware, checkPermission('documents:write'), documentController.deleteDocument);
 
 /**
  * @swagger
@@ -327,7 +328,7 @@ router.delete('/:id', authMiddleware, documentController.deleteDocument);
  *       500:
  *         description: Lỗi máy chủ khi tải file
  */
-router.post('/upload', authMiddleware, uploadMem.single('file'), async (req, res) => {
+router.post('/upload', authMiddleware, checkPermission('documents:write'), uploadMem.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp file cần tải lên.' });
