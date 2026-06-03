@@ -37,17 +37,8 @@ class UserController {
    */
   async getAllUsers(req, res) {
     try {
-      let { page, limit, search, status, departmentId } = req.query;
+      let { search, status, departmentId } = req.query;
 
-      page = parseInt(page) || 1;
-      
-      let parsedLimit;
-      if (limit === 'all' || limit === '-1' || limit === 'none') {
-        parsedLimit = 'all';
-      } else {
-        parsedLimit = parseInt(limit) || 10;
-      }
-      
       search = search ? search.trim() : '';
 
       // Kiểm soát giá trị lọc status hợp lệ
@@ -58,7 +49,7 @@ class UserController {
         });
       }
 
-      const result = await userService.findAll({ page, limit: parsedLimit, search, status, departmentId });
+      const result = await userService.findAll({ search, status, departmentId });
 
       return res.status(200).json({
         success: true,
@@ -390,7 +381,7 @@ class UserController {
       const { status } = req.body;
 
       // Kiểm tra định dạng ObjectId
-      if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (!mongoose.Types.ObjectId.isVad(id)) {
         return res.status(400).json({
           success: false,
           message: 'ID người dùng không hợp lệ.',
