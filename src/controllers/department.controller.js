@@ -166,53 +166,7 @@ class DepartmentController {
     }
   }
 
-  /**
-   * Ẩn phòng ban và reset departmentId của nhân sự về null (chỉ Admin)
-   */
-  async deleteDepartment(req, res) {
-    try {
-      const { id } = req.params;
 
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({
-          success: false,
-          message: 'ID phòng ban không hợp lệ.',
-        });
-      }
-
-      const department = await departmentService.findById(id);
-      if (!department) {
-        return res.status(404).json({
-          success: false,
-          message: 'Phòng ban không tồn tại.',
-        });
-      }
-
-      // Ẩn phòng ban
-      await departmentService.hideDepartment(id);
-
-      // Ghi lịch sử thao tác ẩn phòng ban
-      const auditLogService = require('../services/auditLog.service');
-      auditLogService.log(
-        req.user.sub,
-        'department.update',
-        { type: 'department', id: department._id.toString(), name: department.name },
-        { isHidden: true }
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: 'Phòng ban đã được ẩn thành công.',
-      });
-    } catch (error) {
-      console.error('Error in deleteDepartment:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Lỗi máy chủ khi ẩn phòng ban.',
-        error: error.message,
-      });
-    }
-  }
 
   /**
    * Đảo ngược trạng thái hiển thị (Bật/Tắt ẩn) của phòng ban (chỉ Admin)
