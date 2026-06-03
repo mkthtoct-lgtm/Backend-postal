@@ -56,23 +56,29 @@ class UserService {
       }
     }
 
-    const skip = (page - 1) * limit;
+    const isUnlimited = limit === -1 || limit === 'all';
+    const total = await User.countDocuments(filter);
 
-    const [users, total] = await Promise.all([
-      User.find(filter)
-        .select('-passwordHash') // Không trả về mật khẩu hash vì lý do bảo mật
+    let users;
+    if (isUnlimited) {
+      users = await User.find(filter)
+        .select('-passwordHash')
+        .sort({ createdAt: -1 });
+    } else {
+      const skip = (page - 1) * limit;
+      users = await User.find(filter)
+        .select('-passwordHash')
         .skip(skip)
         .limit(limit)
-        .sort({ createdAt: -1 }),
-      User.countDocuments(filter),
-    ]);
+        .sort({ createdAt: -1 });
+    }
 
     return {
       users,
       total,
-      page,
-      limit,
-      pages: Math.ceil(total / limit),
+      page: isUnlimited ? 1 : page,
+      limit: isUnlimited ? total : limit,
+      pages: isUnlimited ? 1 : Math.ceil(total / limit),
     };
   }
 
