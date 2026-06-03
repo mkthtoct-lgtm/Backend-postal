@@ -21,18 +21,44 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    socialLink: {
+      type: String,
+      default: null,
+    },
+    city: {
+      type: String,
+      default: null,
+    },
+    ward: {
+      type: String,
+      default: null,
+    },
+    addressDetail: {
+      type: String,
+      default: null,
+    },
+    address: {
+      type: String,
+      default: null,
+    },
+    referralCode: {
+      type: String,
+      default: null,
+    },
     avatarUrl: {
       type: String,
       default: null,
     },
     roleId: {
       type: mongoose.Schema.Types.ObjectId,
+      ref: 'Role',
       required: true,
       // Giá trị ObjectId mặc định cho USER (có thể thay đổi sau nếu cần)
       default: () => new mongoose.Types.ObjectId('60c72b2f9b1d8b2bad000001'),
     },
     departmentId: {
       type: mongoose.Schema.Types.ObjectId,
+      ref: 'Department',
       default: null,
     },
     status: {
