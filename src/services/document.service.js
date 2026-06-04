@@ -1,17 +1,59 @@
 const Document = require('../models/Document');
 
+/**
+ * Phân nhóm người dùng dựa trên vai trò để kiểm duyệt quyền tài liệu (quy chuẩn tương thích Frontend)
+ * @param {string} roleSlug - Slug của vai trò người dùng (e.g. 'admin', 'board_of_directors', 'truongbophan')
+ * @returns {string[]} Danh sách các nhóm của người dùng
+ */
+const getUserGroupIds = (roleSlug) => {
+  const groups = ['all'];
+  const normRole = roleSlug === 'board_of_directors' ? 'bangiamdoc' : roleSlug;
+
+  if (['admin', 'bangiamdoc', 'board_of_directors', 'truongbophan', 'nhansu', 'user', 'staff'].includes(normRole)) {
+    groups.push('internal');
+  }
+
+  if (['daily', 'congtacvien'].includes(normRole)) {
+    groups.push('partner');
+  }
+
+  if (['admin', 'bangiamdoc', 'board_of_directors', 'truongbophan'].includes(normRole)) {
+    groups.push('manager');
+  }
+
+  return groups;
+};
+
 class DocumentService {
   /**
-   * Lấy danh sách tài liệu có phân trang và lọc theo danh mục
-   * @param {Object} queryParams - page, limit, categoryId
+   * Lấy danh sách tài liệu có phân trang và lọc theo danh mục & phân quyền người dùng
+   * @param {Object} queryParams - page, limit, categoryId, roleSlug, departmentId
    * @returns {Promise<Object>} Object chứa danh sách items và total
    */
-  async findAndCount({ page = 1, limit = 10, categoryId }) {
+  async findAndCount({ page = 1, limit = 10, categoryId, roleSlug, departmentId }) {
     const filter = { deletedAt: null };
 
     // Lọc theo danh mục nếu được cung cấp
     if (categoryId && categoryId !== 'all') {
       filter.categoryId = categoryId;
+    }
+
+    // Áp dụng phân quyền dòng (Row-level permissions)
+    if (roleSlug && roleSlug !== 'admin') {
+      const userGroups = getUserGroupIds(roleSlug);
+      const orConditions = [
+        { 'permissions.view.groups': { $in: userGroups } },
+        { 'permissions.view.roles': roleSlug }
+      ];
+
+      if (departmentId) {
+        orConditions.push({ 'permissions.view.departments': departmentId.toString() });
+      }
+
+      filter.$and = [
+        ...(filter.$and || []),
+        { $or: orConditions }
+      ];
     }
 
     const skip = (page - 1) * limit;

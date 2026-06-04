@@ -10,6 +10,7 @@ const departmentRoutes = require('./routes/department.routes');
 const auditLogRoutes = require('./routes/auditLog.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+const jobDescriptionRoutes = require('./routes/jobDescription.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 
 const app = express();
@@ -49,6 +50,8 @@ app.use('/api/v1/notifications', notificationRoutes);
 
 // Khai báo định tuyến cho Dashboard (theo role)
 app.use('/api/v1/dashboard', dashboardRoutes);
+// Khai báo định tuyến cho hệ thống JD công việc (Job Descriptions)
+app.use('/api/v1/job-descriptions', jobDescriptionRoutes);
 
 app.get('/', (req, res) => {
   res.json({

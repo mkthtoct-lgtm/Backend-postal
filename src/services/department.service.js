@@ -7,10 +7,11 @@ class DepartmentService {
    * Lấy danh sách tất cả phòng ban chưa bị ẩn, kèm số lượng nhân sự
    * @returns {Promise<Array>} Danh sách Department có field memberCount
    */
-  async findAll() {
+  async findAll(includeHidden = false) {
     // Dùng aggregate để đếm memberCount từ collection users
+    const matchCondition = includeHidden ? {} : { isHidden: false };
     const departments = await Department.aggregate([
-      { $match: { isHidden: false } },
+      { $match: matchCondition },
       {
         $lookup: {
           from: 'users',
@@ -50,8 +51,9 @@ class DepartmentService {
    * @param {string} id - Mongoose ID của phòng ban
    * @returns {Promise<Object|null>}
    */
-  async findById(id) {
-    return await Department.findOne({ _id: id, isHidden: false });
+  async findById(id, includeHidden = false) {
+    const filter = includeHidden ? { _id: id } : { _id: id, isHidden: false };
+    return await Department.findOne(filter);
   }
 
   /**
@@ -107,28 +109,22 @@ class DepartmentService {
     );
   }
 
+
+
   /**
-   * Ẩn phòng ban (soft delete) và reset departmentId của tất cả User thuộc phòng ban về null
-   * @param {string} id - ID phòng ban cần ẩn
-   * @returns {Promise<Object|null>} Phòng ban đã ẩn
+   * Đảo ngược trạng thái hiển thị của phòng ban (Bật/Tắt ẩn)
+   * Nếu chuyển sang trạng thái ẩn (true), gỡ toàn bộ nhân viên ra khỏi phòng ban
+   * @param {string} id - ID phòng ban
+   * @returns {Promise<Object|null>} Phòng ban sau khi cập nhật
    */
-  async hideDepartment(id) {
-    // Ẩn phòng ban
-    const hidden = await Department.findOneAndUpdate(
-      { _id: id, isHidden: false },
-      { $set: { isHidden: true } },
-      { returnDocument: 'after' }
-    );
+  async toggleVisibility(id) {
+    const department = await Department.findById(id);
+    if (!department) return null;
 
-    if (hidden) {
-      // Reset departmentId của tất cả user thuộc phòng ban này về null
-      await User.updateMany(
-        { departmentId: new mongoose.Types.ObjectId(id), deletedAt: null },
-        { $set: { departmentId: null } }
-      );
-    }
+    department.isHidden = !department.isHidden;
+    const saved = await department.save();
 
-    return hidden;
+    return saved;
   }
 }
 
