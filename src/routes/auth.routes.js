@@ -87,6 +87,50 @@ router.post('/register', authController.register);
 
 /**
  * @swagger
+ * /auth/register-profile:
+ *   post:
+ *     summary: Cập nhật thông tin bổ sung sau khi đăng ký tài khoản thành công
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 example: 60c72b2f9b1d8b2bad000002
+ *               phone:
+ *                 type: string
+ *                 example: 0901234567
+ *               socialLink:
+ *                 type: string
+ *                 example: https://facebook.com/username
+ *               city:
+ *                 type: string
+ *                 example: TP. Hồ Chí Minh
+ *               ward:
+ *                 type: string
+ *                 example: Phường Bến Thành
+ *               addressDetail:
+ *                 type: string
+ *                 example: 123 Nguyễn Du
+ *               referralCode:
+ *                 type: string
+ *                 example: GT1234
+ *     responses:
+ *       200:
+ *         description: Bổ sung thông tin thành công
+ *       400:
+ *         description: Thông tin đầu vào không hợp lệ
+ */
+router.post('/register-profile', authController.registerProfile);
+
+/**
+ * @swagger
  * /auth/login:
  *   post:
  *     summary: Đăng nhập vào hệ thống

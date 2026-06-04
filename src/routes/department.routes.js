@@ -125,11 +125,13 @@ router.post('/', authMiddleware, checkPermission('departments:write'), departmen
  */
 router.patch('/:id', authMiddleware, checkPermission('departments:write'), departmentController.updateDepartment);
 
+
+
 /**
  * @swagger
- * /departments/{id}:
- *   delete:
- *     summary: Ẩn phòng ban và gỡ nhân sự khỏi phòng ban (chỉ Admin)
+ * /departments/{id}/toggle-visibility:
+ *   patch:
+ *     summary: Bật/Tắt ẩn phòng ban (Đảo ngược trường isHidden - chỉ Admin)
  *     tags: [Departments]
  *     security:
  *       - BearerAuth: []
@@ -139,10 +141,10 @@ router.patch('/:id', authMiddleware, checkPermission('departments:write'), depar
  *         required: true
  *         schema:
  *           type: string
- *         description: Mongoose ID của phòng ban cần ẩn
+ *         description: Mongoose ID của phòng ban cần thay đổi trạng thái ẩn/hiện
  *     responses:
  *       200:
- *         description: Ẩn phòng ban thành công
+ *         description: Thay đổi trạng thái hiển thị thành công
  *       400:
  *         description: ID không hợp lệ
  *       404:
@@ -150,6 +152,6 @@ router.patch('/:id', authMiddleware, checkPermission('departments:write'), depar
  *       401:
  *         description: Chưa đăng nhập
  */
-router.delete('/:id', authMiddleware, checkPermission('departments:write'), departmentController.deleteDepartment);
+router.patch('/:id/toggle-visibility', authMiddleware, checkPermission('departments:write'), departmentController.toggleVisibility);
 
 module.exports = router;

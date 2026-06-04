@@ -37,10 +37,8 @@ class UserController {
    */
   async getAllUsers(req, res) {
     try {
-      let { page, limit, search, status, departmentId } = req.query;
+      let { search, status, departmentId } = req.query;
 
-      page = parseInt(page) || 1;
-      limit = parseInt(limit) || 10;
       search = search ? search.trim() : '';
 
       // Kiểm soát giá trị lọc status hợp lệ
@@ -51,7 +49,7 @@ class UserController {
         });
       }
 
-      const result = await userService.findAll({ page, limit, search, status, departmentId });
+      const result = await userService.findAll({ search, status, departmentId });
 
       return res.status(200).json({
         success: true,
@@ -381,7 +379,7 @@ class UserController {
     try {
       const { id } = req.params;
       const { status } = req.body;
-
+      
       // Kiểm tra định dạng ObjectId
       if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({

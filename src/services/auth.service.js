@@ -42,6 +42,33 @@ class AuthService {
   }
 
   /**
+   * Cập nhật thông tin bổ sung cho tài khoản mới đăng ký
+   */
+  async registerProfile(profileData) {
+    const { userId, phone, socialLink, city, ward, addressDetail, referralCode } = profileData;
+
+    const user = await userService.findById(userId);
+    if (!user) {
+      throw new Error('Người dùng không tồn tại.');
+    }
+
+    // Ghép địa chỉ đầy đủ
+    const address = [addressDetail, ward, city].filter(Boolean).join(', ');
+
+    const updatedUser = await userService.update(userId, {
+      phone: phone || null,
+      socialLink: socialLink || null,
+      city: city || null,
+      ward: ward || null,
+      addressDetail: addressDetail || null,
+      address: address || null,
+      referralCode: referralCode || null,
+    });
+
+    return this.toAuthenticatedUser(updatedUser);
+  }
+
+  /**
    * Xác thực thông tin đăng nhập (Email & Mật khẩu)
    */
   async validateUser(loginData) {
