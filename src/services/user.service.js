@@ -23,6 +23,19 @@ class UserService {
     return await User.findOne({
       _id: id,
       deletedAt: null,
+    }).populate('referred_by_user_id', 'fullName email referral_code');
+  }
+
+  /**
+   * Tìm kiếm người dùng bằng mã giới thiệu của họ (referral_code)
+   * @param {string} referralCode - Mã giới thiệu cần tìm
+   * @returns {Promise<Object|null>} Bản ghi User hoặc null
+   */
+  async findByReferralCode(referralCode) {
+    if (!referralCode) return null;
+    return await User.findOne({
+      referral_code: referralCode.trim(),
+      deletedAt: null,
     });
   }
 
@@ -67,11 +80,78 @@ class UserService {
   }
 
   /**
+   * Helper chuẩn hóa họ tên và sinh mã giới thiệu độc nhất dạng [viết_tắt][3_số_ngẫu_nhiên]
+   * Ví dụ: "Nguyễn Khổng Đạt" -> "nkd123"
+   * @param {string} fullName - Họ tên đầy đủ của người dùng
+   * @returns {Promise<string>} Mã giới thiệu độc nhất
+   */
+  async generateUniqueReferralCode(fullName) {
+    if (!fullName || typeof fullName !== 'string') {
+      fullName = 'user';
+    }
+
+    // 1. Tách các từ trong họ tên và lấy chữ cái đầu của mỗi từ
+    const words = fullName.trim().split(/\s+/).filter(Boolean);
+    let initials = words.map(word => word.charAt(0)).join('');
+
+    // 2. Chuẩn hóa chữ cái đầu: chuyển tiếng Việt thành không dấu và loại bỏ ký tự đặc biệt
+    let prefix = initials
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toLowerCase();
+
+    // Nếu tiền tố rỗng, sử dụng giá trị mặc định là 'ref'
+    if (!prefix) {
+      prefix = 'ref';
+    }
+
+    let isUnique = false;
+    let referralCode = '';
+    let attempts = 0;
+
+    while (!isUnique && attempts < 50) {
+      attempts++;
+      let randomNumber;
+      
+      // Tùy theo số lần thử mà tăng không gian số ngẫu nhiên
+      if (attempts < 10) {
+        randomNumber = Math.floor(100 + Math.random() * 900); // 3 chữ số (100 - 999)
+      } else if (attempts < 20) {
+        randomNumber = Math.floor(1000 + Math.random() * 9000); // 4 chữ số (1000 - 9999)
+      } else {
+        randomNumber = Math.floor(10000 + Math.random() * 90000); // 5 chữ số (10000 - 99999)
+      }
+
+      referralCode = `${prefix}${randomNumber}`;
+
+      // Kiểm tra sự tồn tại trong DB (tìm kiếm bao gồm cả các user đã xóa mềm)
+      const existingUser = await User.findOne({ referral_code: referralCode });
+      if (!existingUser) {
+        isUnique = true;
+      }
+    }
+
+    // Nếu thử 50 lần vẫn trùng (rất hiếm khi xảy ra), sinh chuỗi ngẫu nhiên bằng crypto
+    if (!isUnique) {
+      const crypto = require('crypto');
+      referralCode = `${prefix}${crypto.randomBytes(3).toString('hex')}`;
+    }
+
+    return referralCode;
+  }
+
+  /**
    * Tạo người dùng mới trong cơ sở dữ liệu
    * @param {Object} userData - Dữ liệu người dùng (fullName, email, passwordHash, roleId, departmentId, status)
    * @returns {Promise<Object>} Người dùng vừa được tạo
    */
   async create(userData) {
+    // Tự động tạo mã giới thiệu duy nhất cho người dùng mới
+    const referral_code = await this.generateUniqueReferralCode(userData.fullName);
+
     const newUser = new User({
       fullName: userData.fullName,
       email: userData.email,
@@ -81,6 +161,7 @@ class UserService {
       status: userData.status || 'active',
       phone: userData.phone || null,
       avatarUrl: userData.avatarUrl || null,
+      referral_code,
     });
 
     return await newUser.save();

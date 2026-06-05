@@ -41,8 +41,18 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
-    referralCode: {
+    referral_code_user: {
       type: String,
+      default: null,
+    },
+    referral_code: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    referred_by_user_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
       default: null,
     },
     avatarUrl: {
