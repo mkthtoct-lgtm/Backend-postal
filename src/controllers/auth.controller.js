@@ -292,6 +292,41 @@ class AuthController {
       data: req.user,
     });
   }
+
+  /**
+   * Lấy mã giới thiệu và link giới thiệu của người dùng đang đăng nhập
+   */
+  async getReferralInfo(req, res) {
+    try {
+      const userService = require('../services/user.service');
+      const userId = req.user.sub;
+      const user = await userService.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy người dùng.',
+        });
+      }
+
+      const env = require('../configs/env');
+      const referralCode = user.referral_code || '';
+      const referralUrl = `${env.FRONTEND_URL}/register?ref=${referralCode}`;
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          referralCode,
+          referralUrl,
+        },
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi lấy thông tin giới thiệu.',
+        error: error.message,
+      });
+    }
+  }
 }
 
 module.exports = new AuthController();
