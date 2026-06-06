@@ -52,6 +52,15 @@ class AuthService {
       throw new Error('Người dùng không tồn tại.');
     }
 
+    let referred_by_user_id = null;
+    if (referralCode && referralCode.trim() !== '') {
+      const referrer = await userService.findByReferralCode(referralCode);
+      if (!referrer) {
+        throw new Error('Mã giới thiệu không tồn tại trong hệ thống.');
+      }
+      referred_by_user_id = referrer._id;
+    }
+
     // Ghép địa chỉ đầy đủ
     const address = [addressDetail, ward, city].filter(Boolean).join(', ');
 
@@ -62,7 +71,8 @@ class AuthService {
       ward: ward || null,
       addressDetail: addressDetail || null,
       address: address || null,
-      referralCode: referralCode || null,
+      referral_code_user: referralCode || null,
+      referred_by_user_id: referred_by_user_id || null,
     });
 
     return this.toAuthenticatedUser(updatedUser);
@@ -281,6 +291,7 @@ class AuthService {
       roleId: user.roleId ? user.roleId.toString() : null,
       departmentId: user.departmentId ? user.departmentId.toString() : null,
       status: user.status,
+      referral_code: user.referral_code || null,
     };
   }
 
