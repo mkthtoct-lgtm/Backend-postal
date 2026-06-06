@@ -348,4 +348,37 @@ router.post('/reset-password', authController.resetPassword);
  */
 router.get('/me', authMiddleware, authController.me);
 
+/**
+ * @swagger
+ * /auth/me/referral:
+ *   get:
+ *     summary: Lấy mã giới thiệu và đường link giới thiệu của người dùng đang đăng nhập
+ *     tags: [Authentication]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy thông tin thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     referralCode:
+ *                       type: string
+ *                       example: nkd138
+ *                     referralUrl:
+ *                       type: string
+ *                       example: https://hubportal-eight.vercel.app/register?ref=nkd138
+ *       401:
+ *         description: Chưa đăng nhập, token hết hạn hoặc sai định dạng
+ */
+router.get('/me/referral', authMiddleware, authController.getReferralInfo);
+
 module.exports = router;
