@@ -73,6 +73,7 @@ class AuthService {
       address: address || null,
       referral_code_user: referralCode || null,
       referred_by_user_id: referred_by_user_id || null,
+      status: 'active', // Kích hoạt tài khoản sau khi hoàn tất thông tin hồ sơ
     });
 
     return this.toAuthenticatedUser(updatedUser);
@@ -97,6 +98,13 @@ class AuthService {
 
     // Kiểm tra trạng thái tài khoản
     if (user.status !== 'active') {
+      if (user.status === 'pending') {
+        // Trả về lỗi có cấu trúc để Frontend biết redirect về trang register-profile
+        const err = new Error('Tài khoản chưa hoàn tất đăng ký. Vui lòng bổ sung thông tin hồ sơ.');
+        err.code = 'ACCOUNT_PENDING';
+        err.userId = user._id.toString();
+        throw err;
+      }
       throw new Error('Tài khoản đã bị khóa hoặc ngừng kích hoạt.');
     }
 
