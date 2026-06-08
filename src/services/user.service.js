@@ -80,20 +80,32 @@ class UserService {
   }
 
   /**
-   * Sinh mã giới thiệu độc nhất dạng chữ hoa + số ngẫu nhiên (6 ký tự)
-   * Ví dụ: "RE39FW", "A1B2C3"
+   * Sinh mã giới thiệu độc nhất 6 ký tự, luôn có cả chữ HOA lẫn số xen kẽ ngẫu nhiên
+   * Ví dụ: "R3F9W2", "A7B1C4", "2K8ZP5"
    * @returns {Promise<string>} Mã giới thiệu độc nhất
    */
   async generateUniqueReferralCode() {
-    const CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const CODE_LENGTH = 6;
+    const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const DIGITS  = '0123456789';
 
     const generateCode = () => {
-      let code = '';
-      for (let i = 0; i < CODE_LENGTH; i++) {
-        code += CHARSET.charAt(Math.floor(Math.random() * CHARSET.length));
+      // Lấy 3 chữ hoa + 3 số ngẫu nhiên để đảm bảo luôn có cả hai loại
+      const chars = [
+        LETTERS.charAt(Math.floor(Math.random() * LETTERS.length)),
+        LETTERS.charAt(Math.floor(Math.random() * LETTERS.length)),
+        LETTERS.charAt(Math.floor(Math.random() * LETTERS.length)),
+        DIGITS.charAt(Math.floor(Math.random() * DIGITS.length)),
+        DIGITS.charAt(Math.floor(Math.random() * DIGITS.length)),
+        DIGITS.charAt(Math.floor(Math.random() * DIGITS.length)),
+      ];
+
+      // Shuffle ngẫu nhiên (Fisher-Yates) để vị trí xen kẽ tình cờ
+      for (let i = chars.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [chars[i], chars[j]] = [chars[j], chars[i]];
       }
-      return code;
+
+      return chars.join('');
     };
 
     let isUnique = false;
