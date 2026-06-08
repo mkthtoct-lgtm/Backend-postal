@@ -80,64 +80,42 @@ class UserService {
   }
 
   /**
-   * Helper chuẩn hóa họ tên và sinh mã giới thiệu độc nhất dạng [viết_tắt][3_số_ngẫu_nhiên]
-   * Ví dụ: "Nguyễn Khổng Đạt" -> "nkd123"
-   * @param {string} fullName - Họ tên đầy đủ của người dùng
+   * Sinh mã giới thiệu độc nhất dạng chữ hoa + số ngẫu nhiên (6 ký tự)
+   * Ví dụ: "RE39FW", "A1B2C3"
    * @returns {Promise<string>} Mã giới thiệu độc nhất
    */
-  async generateUniqueReferralCode(fullName) {
-    if (!fullName || typeof fullName !== 'string') {
-      fullName = 'user';
-    }
+  async generateUniqueReferralCode() {
+    const CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const CODE_LENGTH = 6;
 
-    // 1. Tách các từ trong họ tên và lấy chữ cái đầu của mỗi từ
-    const words = fullName.trim().split(/\s+/).filter(Boolean);
-    let initials = words.map(word => word.charAt(0)).join('');
-
-    // 2. Chuẩn hóa chữ cái đầu: chuyển tiếng Việt thành không dấu và loại bỏ ký tự đặc biệt
-    let prefix = initials
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/đ/g, 'd')
-      .replace(/Đ/g, 'D')
-      .replace(/[^a-zA-Z0-9]/g, '')
-      .toLowerCase();
-
-    // Nếu tiền tố rỗng, sử dụng giá trị mặc định là 'ref'
-    if (!prefix) {
-      prefix = 'ref';
-    }
+    const generateCode = () => {
+      let code = '';
+      for (let i = 0; i < CODE_LENGTH; i++) {
+        code += CHARSET.charAt(Math.floor(Math.random() * CHARSET.length));
+      }
+      return code;
+    };
 
     let isUnique = false;
     let referralCode = '';
     let attempts = 0;
 
+    // Thử tối đa 50 lần để đảm bảo mã không trùng trong DB
     while (!isUnique && attempts < 50) {
       attempts++;
-      let randomNumber;
-      
-      // Tùy theo số lần thử mà tăng không gian số ngẫu nhiên
-      if (attempts < 10) {
-        randomNumber = Math.floor(100 + Math.random() * 900); // 3 chữ số (100 - 999)
-      } else if (attempts < 20) {
-        randomNumber = Math.floor(1000 + Math.random() * 9000); // 4 chữ số (1000 - 9999)
-      } else {
-        randomNumber = Math.floor(10000 + Math.random() * 90000); // 5 chữ số (10000 - 99999)
-      }
+      referralCode = generateCode();
 
-      referralCode = `${prefix}${randomNumber}`;
-
-      // Kiểm tra sự tồn tại trong DB (tìm kiếm bao gồm cả các user đã xóa mềm)
+      // Kiểm tra sự tồn tại trong DB (bao gồm cả các user đã xóa mềm)
       const existingUser = await User.findOne({ referral_code: referralCode });
       if (!existingUser) {
         isUnique = true;
       }
     }
 
-    // Nếu thử 50 lần vẫn trùng (rất hiếm khi xảy ra), sinh chuỗi ngẫu nhiên bằng crypto
+    // Fallback cực kỳ hiếm: nếu 50 lần vẫn trùng, dùng crypto để đảm bảo tính độc nhất
     if (!isUnique) {
       const crypto = require('crypto');
-      referralCode = `${prefix}${crypto.randomBytes(3).toString('hex')}`;
+      referralCode = crypto.randomBytes(3).toString('hex').toUpperCase();
     }
 
     return referralCode;
@@ -150,7 +128,7 @@ class UserService {
    */
   async create(userData) {
     // Tự động tạo mã giới thiệu duy nhất cho người dùng mới
-    const referral_code = await this.generateUniqueReferralCode(userData.fullName);
+    const referral_code = await this.generateUniqueReferralCode();
 
     const newUser = new User({
       fullName: userData.fullName,
@@ -158,7 +136,7 @@ class UserService {
       passwordHash: userData.passwordHash,
       roleId: userData.roleId,
       departmentId: userData.departmentId || null,
-      status: userData.status || 'active',
+      status: userData.status || 'pending',
       phone: userData.phone || null,
       avatarUrl: userData.avatarUrl || null,
       referral_code,
