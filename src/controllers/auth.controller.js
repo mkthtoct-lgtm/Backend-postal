@@ -147,6 +147,15 @@ class AuthController {
         data: result,
       });
     } catch (error) {
+      // Tài khoản chưa hoàn tất đăng ký → trả về userId để Frontend redirect về trang register-profile
+      if (error.code === 'ACCOUNT_PENDING') {
+        return res.status(403).json({
+          success: false,
+          error_code: 'ACCOUNT_PENDING',
+          message: error.message,
+          data: { userId: error.userId },
+        });
+      }
       return res.status(401).json({
         success: false,
         message: error.message || 'Email hoặc mật khẩu không chính xác.',
