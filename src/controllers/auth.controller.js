@@ -31,6 +31,47 @@ const validatePasswordComplexity = (password) => {
 
 class AuthController {
   /**
+   * Kiểm tra email đã tồn tại trong hệ thống chưa (Check Email)
+   */
+  async checkEmail(req, res) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng cung cấp địa chỉ email cần kiểm tra.',
+        });
+      }
+
+      if (!validateEmailFormat(email)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Định dạng Email không hợp lệ (Ví dụ: user@example.com).',
+        });
+      }
+
+      const userService = require('../services/user.service');
+      const existing = await userService.findByEmail(email);
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          available: !existing,
+          message: existing
+            ? 'Email này đã được sử dụng trong hệ thống.'
+            : 'Email hợp lệ, có thể sử dụng để đăng ký.',
+        },
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi kiểm tra email.',
+      });
+    }
+  }
+
+  /**
    * Đăng ký tài khoản mới (Register)
    */
   async register(req, res) {

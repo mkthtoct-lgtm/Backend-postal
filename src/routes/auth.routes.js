@@ -83,7 +83,53 @@ const router = express.Router();
  *       400:
  *         description: Thông tin đầu vào không hợp lệ hoặc email đã tồn tại
  */
+/**
+ * @swagger
+ * /auth/check-email:
+ *   post:
+ *     summary: Kiểm tra email đã tồn tại trong hệ thống chưa
+ *     description: Dùng trước bước đăng ký để thông báo ngay cho người dùng nếu email đã được sử dụng.
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: nguyenhuana@example.com
+ *     responses:
+ *       200:
+ *         description: Kết quả kiểm tra email
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     available:
+ *                       type: boolean
+ *                       example: true
+ *                     message:
+ *                       type: string
+ *                       example: Email hợp lệ, có thể sử dụng để đăng ký.
+ *       400:
+ *         description: Email không hợp lệ hoặc thiếu trường email
+ */
+router.post('/check-email', authController.checkEmail);
+
 router.post('/register', authController.register);
+
 
 /**
  * @swagger
