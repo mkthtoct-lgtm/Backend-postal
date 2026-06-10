@@ -25,6 +25,14 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    zaloLink: {
+      type: String,
+      default: null,
+    },
+    instagramLink: {
+      type: String,
+      default: null,
+    },
     city: {
       type: String,
       default: null,
