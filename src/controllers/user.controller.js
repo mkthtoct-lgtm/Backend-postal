@@ -31,6 +31,33 @@ const validatePasswordComplexity = (password) => {
   return { isValid: true };
 };
 
+// Hàm helper làm sạch và chuyển đổi User object chỉ giữ lại các trường của Mongoose Schema
+const toCleanUserResponse = (user) => {
+  if (!user) return null;
+  return {
+    _id: user._id.toString(),
+    fullName: user.fullName,
+    email: user.email,
+    phone: user.phone || null,
+    socialLink: user.socialLink || null,
+    city: user.city || null,
+    ward: user.ward || null,
+    addressDetail: user.addressDetail || null,
+    address: user.address || null,
+    referral_code_user: user.referral_code_user || null,
+    referral_code: user.referral_code || null,
+    referred_by_user_id: user.referred_by_user_id || null,
+    avatarUrl: user.avatarUrl || null,
+    bannerUrl: user.bannerUrl || null,
+    roleId: user.roleId ? (user.roleId._id || user.roleId) : null,
+    departmentId: user.departmentId || null,
+    status: user.status,
+    lastLoginAt: user.lastLoginAt || null,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+};
+
 class UserController {
   /**
    * Lấy danh sách toàn bộ người dùng (Có phân trang, tìm kiếm)
@@ -88,14 +115,10 @@ class UserController {
         });
       }
 
-      // Ẩn mật khẩu trước khi phản hồi
-      const userObj = user.toObject();
-      delete userObj.passwordHash;
-
       return res.status(200).json({
         success: true,
         message: 'Lấy thông tin chi tiết người dùng thành công.',
-        data: userObj,
+        data: toCleanUserResponse(user),
       });
     } catch (error) {
       return res.status(500).json({
@@ -221,7 +244,7 @@ class UserController {
   async updateUser(req, res) {
     try {
       const { id } = req.params;
-      const { email, fullName, phone, status, roleId, departmentId } = req.body;
+      const { email, fullName, phone, status, roleId, departmentId, socialLink, city, ward, addressDetail, avatarUrl, bannerUrl } = req.body;
 
       // Kiểm tra định dạng ObjectId
       if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -241,6 +264,22 @@ class UserController {
       }
 
       const updateData = {};
+
+      // Xử lý các tệp tải lên nếu có (avatar, banner)
+      if (req.files) {
+        const protocol = req.protocol;
+        const host = req.get('host');
+
+        if (req.files.avatar && req.files.avatar[0]) {
+          const avatarFile = req.files.avatar[0];
+          updateData.avatarUrl = `${protocol}://${host}/uploads/${avatarFile.filename}`;
+        }
+
+        if (req.files.banner && req.files.banner[0]) {
+          const bannerFile = req.files.banner[0];
+          updateData.bannerUrl = `${protocol}://${host}/uploads/${bannerFile.filename}`;
+        }
+      }
 
       if (fullName !== undefined) {
         if (!fullName.trim()) {
@@ -284,6 +323,38 @@ class UserController {
           });
         }
         updateData.status = status;
+      }
+
+      if (socialLink !== undefined) {
+        updateData.socialLink = socialLink ? socialLink.trim() : null;
+      }
+
+      if (city !== undefined) {
+        updateData.city = city ? city.trim() : null;
+      }
+
+      if (ward !== undefined) {
+        updateData.ward = ward ? ward.trim() : null;
+      }
+
+      if (addressDetail !== undefined) {
+        updateData.addressDetail = addressDetail ? addressDetail.trim() : null;
+      }
+
+      if (avatarUrl !== undefined && !updateData.avatarUrl) {
+        updateData.avatarUrl = avatarUrl ? avatarUrl.trim() : null;
+      }
+
+      if (bannerUrl !== undefined && !updateData.bannerUrl) {
+        updateData.bannerUrl = bannerUrl ? bannerUrl.trim() : null;
+      }
+
+      // Tự động ghép nối địa chỉ đầy đủ nếu có bất kỳ trường địa chỉ nào thay đổi
+      if (city !== undefined || ward !== undefined || addressDetail !== undefined) {
+        const finalDetail = addressDetail !== undefined ? (addressDetail ? addressDetail.trim() : '') : (user.addressDetail || '');
+        const finalWard = ward !== undefined ? (ward ? ward.trim() : '') : (user.ward || '');
+        const finalCity = city !== undefined ? (city ? city.trim() : '') : (user.city || '');
+        updateData.address = [finalDetail, finalWard, finalCity].filter(Boolean).join(', ') || null;
       }
 
       // Xử lý cập nhật Email
@@ -361,7 +432,7 @@ class UserController {
       return res.status(200).json({
         success: true,
         message: 'Cập nhật thông tin người dùng thành công.',
-        data: updatedUser,
+        data: toCleanUserResponse(updatedUser),
       });
     } catch (error) {
       return res.status(500).json({
