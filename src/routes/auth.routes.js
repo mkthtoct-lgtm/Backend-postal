@@ -377,16 +377,52 @@ router.post('/reset-password', authController.resetPassword);
  *                 data:
  *                   type: object
  *                   properties:
- *                     sub:
+ *                     _id:
  *                       type: string
  *                       example: 60c72b2f9b1d8b2bad000002
+ *                     fullName:
+ *                       type: string
+ *                       example: Nguyễn Văn A
  *                     email:
  *                       type: string
  *                       example: nguyenhuana@example.com
+ *                     phone:
+ *                       type: string
+ *                       example: 0901234567
+ *                     socialLink:
+ *                       type: string
+ *                       example: https://facebook.com/username
+ *                     city:
+ *                       type: string
+ *                       example: TP. Hồ Chí Minh
+ *                     ward:
+ *                       type: string
+ *                       example: Phường Bến Thành
+ *                     addressDetail:
+ *                       type: string
+ *                       example: 123 Nguyễn Du
+ *                     address:
+ *                       type: string
+ *                       example: 123 Nguyễn Du, Phường Bến Thành, TP. Hồ Chí Minh
+ *                     avatarUrl:
+ *                       type: string
+ *                       nullable: true
+ *                     bannerUrl:
+ *                       type: string
+ *                       nullable: true
  *                     roleId:
  *                       type: string
  *                       example: 60c72b2f9b1d8b2bad000001
  *                     departmentId:
+ *                       type: string
+ *                       nullable: true
+ *                     status:
+ *                       type: string
+ *                       example: active
+ *                     referral_code:
+ *                       type: string
+ *                       example: GT1234
+ *                     referral_code_user:
  *                       type: string
  *                       nullable: true
  *       401:

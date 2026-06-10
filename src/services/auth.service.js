@@ -296,10 +296,18 @@ class AuthService {
       fullName: user.fullName,
       email: user.email,
       avatarUrl: user.avatarUrl || null,
+      bannerUrl: user.bannerUrl || null,
+      phone: user.phone || null,
+      socialLink: user.socialLink || null,
+      city: user.city || null,
+      ward: user.ward || null,
+      addressDetail: user.addressDetail || null,
+      address: user.address || null,
       roleId: user.roleId ? user.roleId.toString() : null,
       departmentId: user.departmentId ? user.departmentId.toString() : null,
       status: user.status,
       referral_code: user.referral_code || null,
+      referral_code_user: user.referral_code_user || null,
     };
   }
 

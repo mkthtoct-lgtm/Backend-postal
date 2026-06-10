@@ -80,6 +80,10 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    bannerUrl: {
+      type: String,
+      default: null,
+    },
     deletedAt: {
       type: Date,
       default: null,
