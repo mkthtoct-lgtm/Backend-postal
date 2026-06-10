@@ -263,6 +263,25 @@ class UserController {
         });
       }
 
+      // Kiểm soát bảo mật: Kiểm tra thay đổi các trường nhạy cảm (roleId, departmentId, status)
+      // Chỉ cho phép nếu người dùng đang thực hiện (req.user) có quyền `users:write` hoặc `*`
+      const isChangingRole = roleId !== undefined && roleId.toString() !== (user.roleId ? user.roleId.toString() : '');
+      const isChangingDept = departmentId !== undefined && (departmentId ? departmentId.toString() : null) !== (user.departmentId ? user.departmentId.toString() : null);
+      const isChangingStatus = status !== undefined && status !== user.status;
+
+      if (isChangingRole || isChangingDept || isChangingStatus) {
+        const Role = require('../models/Role');
+        const userRole = await Role.findById(req.user.roleId);
+        const hasWritePermission = userRole && (userRole.permissions.includes('*') || userRole.permissions.includes('users:write'));
+
+        if (!hasWritePermission) {
+          return res.status(403).json({
+            success: false,
+            message: 'Bạn không có quyền thay đổi các thông tin quản trị nhạy cảm (vai trò, phòng ban, trạng thái).',
+          });
+        }
+      }
+
       const updateData = {};
 
       // Xử lý các tệp tải lên nếu có (avatar, banner)
