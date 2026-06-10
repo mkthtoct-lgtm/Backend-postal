@@ -12,6 +12,7 @@ const notificationRoutes = require('./routes/notification.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const jobDescriptionRoutes = require('./routes/jobDescription.routes');
 const newsPostRoutes = require('./routes/newsPost.routes');
+const productRoutes = require('./routes/product.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 
 const app = express();
@@ -55,6 +56,8 @@ app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/job-descriptions', jobDescriptionRoutes);
 // Khai báo định tuyến cho hệ thống Tin tức & Sự kiện (News & Events)
 app.use('/api/v1/news-posts', newsPostRoutes);
+// Khai báo định tuyến cho hệ thống Sản phẩm dịch vụ (Products)
+app.use('/api/v1/products', productRoutes);
 
 app.get('/', (req, res) => {
   res.json({
