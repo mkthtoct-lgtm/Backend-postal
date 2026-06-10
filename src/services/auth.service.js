@@ -299,6 +299,8 @@ class AuthService {
       bannerUrl: user.bannerUrl || null,
       phone: user.phone || null,
       socialLink: user.socialLink || null,
+      zaloLink: user.zaloLink || null,
+      instagramLink: user.instagramLink || null,
       city: user.city || null,
       ward: user.ward || null,
       addressDetail: user.addressDetail || null,

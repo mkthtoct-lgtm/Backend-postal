@@ -38,6 +38,8 @@ const toCleanUserResponse = (user) => {
     email: user.email,
     phone: user.phone || null,
     socialLink: user.socialLink || null,
+    zaloLink: user.zaloLink || null,
+    instagramLink: user.instagramLink || null,
     city: user.city || null,
     ward: user.ward || null,
     addressDetail: user.addressDetail || null,
@@ -50,6 +52,7 @@ const toCleanUserResponse = (user) => {
     roleId: user.roleId ? (user.roleId._id || user.roleId) : null,
     departmentId: user.departmentId || null,
     status: user.status,
+    dealCount: user.dealCount || 0,
     lastLoginAt: user.lastLoginAt || null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
@@ -372,6 +375,11 @@ class AuthController {
           message: 'Không tìm thấy thông tin tài khoản người dùng.',
         });
       }
+
+      // Đếm số lượng deal thực tế từ lead
+      const Lead = require('../models/Lead');
+      const dealCount = await Lead.countDocuments({ collaboratorId: req.user.sub, status: 'xu_ly_ho_so', deletedAt: null });
+      user.dealCount = dealCount;
 
       return res.status(200).json({
         success: true,

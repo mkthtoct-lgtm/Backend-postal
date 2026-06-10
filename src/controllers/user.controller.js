@@ -40,6 +40,8 @@ const toCleanUserResponse = (user) => {
     email: user.email,
     phone: user.phone || null,
     socialLink: user.socialLink || null,
+    zaloLink: user.zaloLink || null,
+    instagramLink: user.instagramLink || null,
     city: user.city || null,
     ward: user.ward || null,
     addressDetail: user.addressDetail || null,
@@ -52,10 +54,46 @@ const toCleanUserResponse = (user) => {
     roleId: user.roleId ? (user.roleId._id || user.roleId) : null,
     departmentId: user.departmentId || null,
     status: user.status,
+    dealCount: user.dealCount || 0,
     lastLoginAt: user.lastLoginAt || null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
+};
+
+// Hàm helper giải mã và lưu ảnh base64 vật lý lên server
+const saveBase64Image = (base64Str, protocol, host) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+
+    // Khớp định dạng: data:image/png;base64,iVBORw...
+    const matches = base64Str.match(/^data:image\/([A-Za-z+]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return null;
+    }
+
+    const extension = matches[1];
+    const buffer = Buffer.from(matches[2], 'base64');
+
+    // Tạo tên file duy nhất giống multer
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const filename = `${uniqueSuffix}-upload.${extension}`;
+    const uploadDir = path.join(__dirname, '../../uploads');
+
+    // Tạo thư mục nếu chưa tồn tại
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const filePath = path.join(uploadDir, filename);
+    fs.writeFileSync(filePath, buffer);
+
+    return `${protocol}://${host}/uploads/${filename}`;
+  } catch (error) {
+    console.error('[Base64 Upload Error] Lỗi khi lưu ảnh:', error);
+    return null;
+  }
 };
 
 class UserController {
@@ -114,6 +152,11 @@ class UserController {
           message: 'Người dùng không tồn tại hoặc đã bị xóa khỏi hệ thống.',
         });
       }
+
+      // Đếm số lượng deal thực tế từ lead
+      const Lead = require('../models/Lead');
+      const dealCount = await Lead.countDocuments({ collaboratorId: id, status: 'xu_ly_ho_so', deletedAt: null });
+      user.dealCount = dealCount;
 
       return res.status(200).json({
         success: true,
@@ -244,7 +287,7 @@ class UserController {
   async updateUser(req, res) {
     try {
       const { id } = req.params;
-      const { email, fullName, phone, status, roleId, departmentId, socialLink, city, ward, addressDetail, avatarUrl, bannerUrl } = req.body;
+      const { email, fullName, phone, status, roleId, departmentId, socialLink, zaloLink, instagramLink, city, ward, addressDetail, avatarUrl, bannerUrl } = req.body;
 
       // Kiểm tra định dạng ObjectId
       if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -348,6 +391,14 @@ class UserController {
         updateData.socialLink = socialLink ? socialLink.trim() : null;
       }
 
+      if (zaloLink !== undefined) {
+        updateData.zaloLink = zaloLink ? zaloLink.trim() : null;
+      }
+
+      if (instagramLink !== undefined) {
+        updateData.instagramLink = instagramLink ? instagramLink.trim() : null;
+      }
+
       if (city !== undefined) {
         updateData.city = city ? city.trim() : null;
       }
@@ -361,11 +412,29 @@ class UserController {
       }
 
       if (avatarUrl !== undefined && !updateData.avatarUrl) {
-        updateData.avatarUrl = avatarUrl ? avatarUrl.trim() : null;
+        if (avatarUrl && avatarUrl.startsWith('data:image/')) {
+          const protocol = req.protocol;
+          const host = req.get('host');
+          const savedUrl = saveBase64Image(avatarUrl, protocol, host);
+          if (savedUrl) {
+            updateData.avatarUrl = savedUrl;
+          }
+        } else {
+          updateData.avatarUrl = avatarUrl ? avatarUrl.trim() : null;
+        }
       }
 
       if (bannerUrl !== undefined && !updateData.bannerUrl) {
-        updateData.bannerUrl = bannerUrl ? bannerUrl.trim() : null;
+        if (bannerUrl && bannerUrl.startsWith('data:image/')) {
+          const protocol = req.protocol;
+          const host = req.get('host');
+          const savedUrl = saveBase64Image(bannerUrl, protocol, host);
+          if (savedUrl) {
+            updateData.bannerUrl = savedUrl;
+          }
+        } else {
+          updateData.bannerUrl = bannerUrl ? bannerUrl.trim() : null;
+        }
       }
 
       // Tự động ghép nối địa chỉ đầy đủ nếu có bất kỳ trường địa chỉ nào thay đổi
@@ -447,6 +516,11 @@ class UserController {
           }).catch((err) => console.error('Failed to log department.assign_user:', err));
         }
       }
+
+      // Đếm số lượng deal thực tế từ lead
+      const Lead = require('../models/Lead');
+      const dealCount = await Lead.countDocuments({ collaboratorId: id, status: 'xu_ly_ho_so', deletedAt: null });
+      updatedUser.dealCount = dealCount;
 
       return res.status(200).json({
         success: true,
