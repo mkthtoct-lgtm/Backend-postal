@@ -219,6 +219,12 @@ router.post('/', authMiddleware, checkPermission('users:write'), userController.
  *                 type: string
  *               socialLink:
  *                 type: string
+ *               zaloLink:
+ *                 type: string
+ *                 example: https://zalo.me/0901234567
+ *               instagramLink:
+ *                 type: string
+ *                 example: https://instagram.com/username
  *               city:
  *                 type: string
  *               ward:
@@ -246,6 +252,10 @@ router.post('/', authMiddleware, checkPermission('users:write'), userController.
  *               departmentId:
  *                 type: string
  *               socialLink:
+ *                 type: string
+ *               zaloLink:
+ *                 type: string
+ *               instagramLink:
  *                 type: string
  *               city:
  *                 type: string
@@ -312,6 +322,12 @@ router.post('/', authMiddleware, checkPermission('users:write'), userController.
  *                 type: string
  *               socialLink:
  *                 type: string
+ *               zaloLink:
+ *                 type: string
+ *                 example: https://zalo.me/0901234567
+ *               instagramLink:
+ *                 type: string
+ *                 example: https://instagram.com/username
  *               city:
  *                 type: string
  *               ward:
@@ -339,6 +355,10 @@ router.post('/', authMiddleware, checkPermission('users:write'), userController.
  *               departmentId:
  *                 type: string
  *               socialLink:
+ *                 type: string
+ *               zaloLink:
+ *                 type: string
+ *               instagramLink:
  *                 type: string
  *               city:
  *                 type: string
