@@ -3,6 +3,22 @@ const userController = require('../controllers/user.controller');
 const authMiddleware = require('../middlewares/auth');
 const checkPermission = require('../middlewares/checkPermission');
 
+const checkUserReadPermission = (req, res, next) => {
+  if (req.user && req.user.sub === req.params.id) {
+    return next();
+  }
+  return checkPermission('users:read')(req, res, next);
+};
+
+const checkUserWritePermission = (req, res, next) => {
+  if (req.user && req.user.sub === req.params.id) {
+    return next();
+  }
+  return checkPermission('users:write')(req, res, next);
+};
+
+const upload = require('../middlewares/upload');
+
 const router = express.Router();
 
 /**
@@ -107,7 +123,7 @@ router.get('/', authMiddleware, checkPermission('users:read'), userController.ge
  *       401:
  *         description: Chưa đăng nhập
  */
-router.get('/:id', authMiddleware, checkPermission('users:read'), userController.getUserById);
+router.get('/:id', authMiddleware, checkUserReadPermission, userController.getUserById);
 
 /**
  * @swagger
@@ -201,6 +217,54 @@ router.post('/', authMiddleware, checkPermission('users:write'), userController.
  *                 type: string
  *               departmentId:
  *                 type: string
+ *               socialLink:
+ *                 type: string
+ *               city:
+ *                 type: string
+ *               ward:
+ *                 type: string
+ *               addressDetail:
+ *                 type: string
+ *               avatarUrl:
+ *                 type: string
+ *               bannerUrl:
+ *                 type: string
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               fullName:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *               roleId:
+ *                 type: string
+ *               departmentId:
+ *                 type: string
+ *               socialLink:
+ *                 type: string
+ *               city:
+ *                 type: string
+ *               ward:
+ *                 type: string
+ *               addressDetail:
+ *                 type: string
+ *               avatarUrl:
+ *                 type: string
+ *               bannerUrl:
+ *                 type: string
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *                 description: File ảnh đại diện cần tải lên
+ *               banner:
+ *                 type: string
+ *                 format: binary
+ *                 description: File ảnh bìa cần tải lên
  *     responses:
  *       200:
  *         description: Cập nhật thành công
@@ -246,6 +310,54 @@ router.post('/', authMiddleware, checkPermission('users:write'), userController.
  *                 type: string
  *               departmentId:
  *                 type: string
+ *               socialLink:
+ *                 type: string
+ *               city:
+ *                 type: string
+ *               ward:
+ *                 type: string
+ *               addressDetail:
+ *                 type: string
+ *               avatarUrl:
+ *                 type: string
+ *               bannerUrl:
+ *                 type: string
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               fullName:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *               roleId:
+ *                 type: string
+ *               departmentId:
+ *                 type: string
+ *               socialLink:
+ *                 type: string
+ *               city:
+ *                 type: string
+ *               ward:
+ *                 type: string
+ *               addressDetail:
+ *                 type: string
+ *               avatarUrl:
+ *                 type: string
+ *               bannerUrl:
+ *                 type: string
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *                 description: File ảnh đại diện cần tải lên
+ *               banner:
+ *                 type: string
+ *                 format: binary
+ *                 description: File ảnh bìa cần tải lên
  *     responses:
  *       200:
  *         description: Cập nhật thành công
@@ -256,8 +368,8 @@ router.post('/', authMiddleware, checkPermission('users:write'), userController.
  *       401:
  *         description: Chưa đăng nhập
  */
-router.put('/:id', authMiddleware, checkPermission('users:write'), userController.updateUser);
-router.patch('/:id', authMiddleware, checkPermission('users:write'), userController.updateUser);
+router.put('/:id', authMiddleware, checkUserWritePermission, upload.fields([{ name: 'avatar', maxCount: 1 }, { name: 'banner', maxCount: 1 }]), userController.updateUser);
+router.patch('/:id', authMiddleware, checkUserWritePermission, upload.fields([{ name: 'avatar', maxCount: 1 }, { name: 'banner', maxCount: 1 }]), userController.updateUser);
 
 
 /**

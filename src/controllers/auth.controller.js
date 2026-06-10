@@ -29,6 +29,33 @@ const validatePasswordComplexity = (password) => {
   return { isValid: true };
 };
 
+// Hàm helper làm sạch và chuyển đổi User object chỉ giữ lại các trường của Mongoose Schema
+const toCleanUserResponse = (user) => {
+  if (!user) return null;
+  return {
+    _id: user._id.toString(),
+    fullName: user.fullName,
+    email: user.email,
+    phone: user.phone || null,
+    socialLink: user.socialLink || null,
+    city: user.city || null,
+    ward: user.ward || null,
+    addressDetail: user.addressDetail || null,
+    address: user.address || null,
+    referral_code_user: user.referral_code_user || null,
+    referral_code: user.referral_code || null,
+    referred_by_user_id: user.referred_by_user_id || null,
+    avatarUrl: user.avatarUrl || null,
+    bannerUrl: user.bannerUrl || null,
+    roleId: user.roleId ? (user.roleId._id || user.roleId) : null,
+    departmentId: user.departmentId || null,
+    status: user.status,
+    lastLoginAt: user.lastLoginAt || null,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+};
+
 class AuthController {
   /**
    * Kiểm tra email đã tồn tại trong hệ thống chưa (Check Email)
@@ -336,11 +363,27 @@ class AuthController {
    * Xem thông tin người dùng đang đăng nhập (Profile)
    */
   async me(req, res) {
-    // req.user được lấy từ authMiddleware trước đó
-    return res.status(200).json({
-      success: true,
-      data: req.user,
-    });
+    try {
+      const userService = require('../services/user.service');
+      const user = await userService.findById(req.user.sub);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy thông tin tài khoản người dùng.',
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: toCleanUserResponse(user),
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi lấy thông tin tài khoản cá nhân.',
+        error: error.message,
+      });
+    }
   }
 
   /**
