@@ -3,12 +3,18 @@ const productService = require('../services/product.service');
 class ProductController {
   /**
    * Lấy toàn bộ danh sách sản phẩm (có tìm kiếm và lọc)
-   * GET /products?search=&type=&status=
+   * GET /products?search=&categoryId=&isActive=
    */
   async getAll(req, res) {
     try {
-      const { search, type, status } = req.query;
-      const products = await productService.findAll({ search, type, status });
+      const { search, categoryId, isActive } = req.query;
+
+      // Chuyển đổi isActive từ string sang boolean nếu có
+      let isActiveParsed;
+      if (isActive === 'true') isActiveParsed = true;
+      else if (isActive === 'false') isActiveParsed = false;
+
+      const products = await productService.findAll({ search, categoryId, isActive: isActiveParsed });
 
       return res.status(200).json({
         success: true,
@@ -57,10 +63,29 @@ class ProductController {
   /**
    * Tạo sản phẩm mới (Chỉ Admin)
    * POST /products
+   * Hỗ trợ upload ảnh (multipart, field "image") hoặc gửi sẵn URL ảnh trong body.image
    */
   async create(req, res) {
     try {
-      const product = await productService.create(req.body);
+      const data = { ...req.body };
+
+      // Nếu có file upload, ưu tiên dùng đường dẫn file vừa lưu
+      if (req.file) {
+        data.image = `/uploads/${req.file.filename}`;
+      }
+
+      // Chuyển đổi kiểu dữ liệu cho các field array/object nếu gửi dạng JSON string
+      if (typeof data.requirements === 'string') {
+        try { data.requirements = JSON.parse(data.requirements); } catch { data.requirements = []; }
+      }
+      if (typeof data.costs === 'string') {
+        try { data.costs = JSON.parse(data.costs); } catch { data.costs = []; }
+      }
+      if (typeof data.steps === 'string') {
+        try { data.steps = JSON.parse(data.steps); } catch { data.steps = []; }
+      }
+
+      const product = await productService.create(data);
 
       return res.status(201).json({
         success: true,
@@ -83,7 +108,24 @@ class ProductController {
   async update(req, res) {
     try {
       const { id } = req.params;
-      const product = await productService.update(id, req.body);
+      const data = { ...req.body };
+
+      if (req.file) {
+        data.image = `/uploads/${req.file.filename}`;
+      }
+
+      // Chuyển đổi kiểu dữ liệu cho các field array/object nếu gửi dạng JSON string
+      if (typeof data.requirements === 'string') {
+        try { data.requirements = JSON.parse(data.requirements); } catch { data.requirements = []; }
+      }
+      if (typeof data.costs === 'string') {
+        try { data.costs = JSON.parse(data.costs); } catch { data.costs = []; }
+      }
+      if (typeof data.steps === 'string') {
+        try { data.steps = JSON.parse(data.steps); } catch { data.steps = []; }
+      }
+
+      const product = await productService.update(id, data);
 
       if (!product) {
         return res.status(404).json({
