@@ -7,18 +7,22 @@ const productSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    // Loại sản phẩm: tương ứng với PRODUCT_TYPES ở FE
-    type: {
-      type: String,
-      enum: ['duhocduc', 'dinhcu', 'visa', 'daotaongonngu', 'nophosoonline'],
-      required: true,
-      default: 'duhocduc',
+    // Danh mục sản phẩm (ObjectId tham chiếu ProductCategory)
+    categoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ProductCategory',
+      default: null,
     },
-    // Trạng thái hiển thị
-    status: {
+    // Quốc gia (mã ISO hoặc "ALL")
+    country: {
       type: String,
-      enum: ['Đang mở', 'Tạm dừng', 'Đã đóng'],
-      default: 'Đang mở',
+      default: '',
+      trim: true,
+    },
+    // Trạng thái hiển thị — dùng isActive thay vì deletedAt để khớp DB thực tế
+    isActive: {
+      type: Boolean,
+      default: true,
     },
     // Mô tả tổng quan sản phẩm
     description: {
@@ -26,27 +30,59 @@ const productSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
-    // Danh sách điều kiện tham gia (mảng string)
-    conditions: {
-      type: [String],
-      default: [],
-    },
-    // Danh sách hạng mục chi phí [{name, amount}]
-    costs: {
+    // Danh sách điều kiện / yêu cầu tham gia
+    requirements: {
       type: [
         {
-          name: { type: String, trim: true },
-          amount: { type: String, trim: true },
+          criteriaType: { type: String, trim: true },
+          criteriaValue: { type: String, trim: true },
+          displayOrder: { type: Number, default: 0 },
         },
       ],
       default: [],
     },
-    // Danh sách các bước quy trình (mảng string)
-    process: {
-      type: [String],
+    // Danh sách hạng mục chi phí
+    costs: {
+      type: [
+        {
+          itemName: { type: String, trim: true },
+          amount: { type: Number, default: 0 },
+          currency: { type: String, default: 'VND', trim: true },
+          note: { type: String, default: '', trim: true },
+          displayOrder: { type: Number, default: 0 },
+        },
+      ],
       default: [],
     },
-    // Xóa mềm: ghi lại thời điểm xóa, null nghĩa là chưa xóa
+    // Danh sách các bước quy trình xử lý hồ sơ
+    steps: {
+      type: [
+        {
+          stepOrder: { type: Number, default: 0 },
+          stepName: { type: String, trim: true },
+          description: { type: String, default: '', trim: true },
+          estimatedDuration: { type: String, default: '', trim: true },
+        },
+      ],
+      default: [],
+    },
+    // Chi phí dịch vụ (số tiền đơn giản, giữ lại để tương thích)
+    serviceFee: {
+      type: Number,
+      default: 0,
+    },
+    currency: {
+      type: String,
+      default: 'VND',
+      trim: true,
+    },
+    // Ảnh đại diện sản phẩm
+    image: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    // Xóa mềm: giữ lại để tương thích với code mới, null = chưa xóa
     deletedAt: {
       type: Date,
       default: null,
@@ -54,7 +90,7 @@ const productSchema = new mongoose.Schema(
   },
   {
     collection: 'products',
-    timestamps: true, // Tự động quản lý createdAt và updatedAt
+    timestamps: true,
   }
 );
 

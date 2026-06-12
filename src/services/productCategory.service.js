@@ -6,7 +6,7 @@ class ProductCategoryService {
    * @returns {Promise<Array>} Danh sách ProductCategory
    */
   async findAll() {
-    return await ProductCategory.find({ deletedAt: null }).sort({ createdAt: -1 });
+    return await ProductCategory.find({ $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }] }).sort({ createdAt: -1 });
   }
 
   /**

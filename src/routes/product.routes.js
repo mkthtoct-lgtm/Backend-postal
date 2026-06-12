@@ -1,6 +1,7 @@
 const express = require('express');
 const productController = require('../controllers/product.controller');
 const authMiddleware = require('../middlewares/auth');
+const upload = require('../middlewares/upload');
 
 const router = express.Router();
 
@@ -119,6 +120,16 @@ router.get('/:id', authMiddleware, productController.getById);
  *     requestBody:
  *       required: true
  *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             allOf:
+ *               - $ref: '#/components/schemas/ProductInput'
+ *               - type: object
+ *                 properties:
+ *                   image:
+ *                     type: string
+ *                     format: binary
+ *                     description: File ảnh sản phẩm (tùy chọn). Có thể bỏ qua nếu dùng field "image" dạng URL string.
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/ProductInput'
@@ -144,7 +155,7 @@ router.get('/:id', authMiddleware, productController.getById);
  *       403:
  *         description: Không có quyền truy cập (Không phải Admin)
  */
-router.post('/', authMiddleware, adminOnlyMiddleware, productController.create);
+router.post('/', authMiddleware, adminOnlyMiddleware, upload.single('image'), productController.create);
 
 /**
  * @swagger
@@ -164,6 +175,16 @@ router.post('/', authMiddleware, adminOnlyMiddleware, productController.create);
  *     requestBody:
  *       required: true
  *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             allOf:
+ *               - $ref: '#/components/schemas/ProductInput'
+ *               - type: object
+ *                 properties:
+ *                   image:
+ *                     type: string
+ *                     format: binary
+ *                     description: File ảnh mới (tùy chọn). Nếu không gửi, ảnh cũ được giữ nguyên.
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/ProductInput'
@@ -179,7 +200,7 @@ router.post('/', authMiddleware, adminOnlyMiddleware, productController.create);
  *       404:
  *         description: Không tìm thấy sản phẩm
  */
-router.patch('/:id', authMiddleware, adminOnlyMiddleware, productController.update);
+router.patch('/:id', authMiddleware, adminOnlyMiddleware, upload.single('image'), productController.update);
 
 /**
  * @swagger
@@ -232,6 +253,10 @@ router.delete('/:id', authMiddleware, adminOnlyMiddleware, productController.del
  *         description:
  *           type: string
  *           example: Chương trình tư vấn, chuẩn bị hồ sơ và lộ trình học nghề tại Đức.
+ *         image:
+ *           type: string
+ *           example: /uploads/1781224970009-abc123-product.png
+ *           description: Đường dẫn ảnh đại diện sản phẩm (truy cập qua /uploads/...)
  *         conditions:
  *           type: array
  *           items:
@@ -283,6 +308,10 @@ router.delete('/:id', authMiddleware, adminOnlyMiddleware, productController.del
  *         description:
  *           type: string
  *           example: Mô tả chi tiết sản phẩm
+ *         image:
+ *           type: string
+ *           example: /uploads/1781224970009-abc123-product.png
+ *           description: Đường dẫn / URL ảnh đại diện sản phẩm (dạng string). Bỏ qua nếu upload file qua field "image" (binary).
  *         conditions:
  *           type: array
  *           items:
