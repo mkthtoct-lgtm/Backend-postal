@@ -90,7 +90,7 @@ const router = express.Router();
  *       401:
  *         description: Chưa đăng nhập
  */
-router.post('/', authMiddleware, leadController.createLead);
+router.post('/', leadController.createLead);
 
 /**
  * @swagger
