@@ -19,7 +19,8 @@ class LeadController {
         budgetRange,
         urgency,
         preferredContact,
-        note
+        note,
+        status
       } = req.body;
 
       if (!customerName || !phone) {
@@ -29,9 +30,25 @@ class LeadController {
         });
       }
 
-      // 1. Lưu trữ thông tin lead cục bộ dưới trạng thái mặc định "dang_tu_van"
+      // Trích xuất collaboratorId nếu có token trong header Authorization
+      let collaboratorId = null;
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        try {
+          const { verifyToken } = require('../utils/jwt');
+          const decoded = verifyToken(token);
+          if (decoded && decoded.sub) {
+            collaboratorId = new mongoose.Types.ObjectId(decoded.sub);
+          }
+        } catch (err) {
+          console.warn('[LeadController] Token không hợp lệ hoặc đã hết hạn:', err.message);
+        }
+      }
+
+      // 1. Lưu trữ thông tin lead cục bộ dưới trạng thái mặc định "dang_tu_van" hoặc trạng thái gửi từ body
       const leadData = {
-        collaboratorId: new mongoose.Types.ObjectId(req.user.sub),
+        collaboratorId,
         customerName: customerName.trim(),
         phone: phone.trim(),
         email: email ? email.trim() : '',
@@ -42,7 +59,7 @@ class LeadController {
         urgency: urgency || 'Trong 1-3 tháng',
         preferredContact: preferredContact || 'Zalo/Điện thoại',
         note: note ? note.trim() : '',
-        status: 'dang_tu_van'
+        status: status || 'dang_tu_van'
       };
 
       const lead = await leadService.create(leadData);
@@ -54,18 +71,24 @@ class LeadController {
         await lead.save();
       }
 
-      // 3. Ghi lịch sử thao tác
-      auditLogService.log(
-        req.user.sub,
-        'lead.create',
-        { type: 'lead', id: lead._id.toString(), name: lead.customerName },
-        { customerName: lead.customerName, phone: lead.phone, status: lead.status }
-      );
+      // 3. Ghi lịch sử thao tác (chỉ ghi nếu có collaborator thực hiện)
+      if (collaboratorId) {
+        auditLogService.log(
+          collaboratorId,
+          'lead.create',
+          { type: 'lead', id: lead._id.toString(), name: lead.customerName },
+          { customerName: lead.customerName, phone: lead.phone, status: lead.status }
+        );
+      }
 
       return res.status(201).json({
         success: true,
         message: 'Gửi lead thông tin khách hàng thành công và đồng bộ sang CRM.',
-        data: lead
+        code: lead._id.toString(),
+        data: {
+          ...lead.toObject(),
+          code: lead._id.toString()
+        }
       });
     } catch (error) {
       console.error('[LeadController] Lỗi khi tạo Lead:', error);
