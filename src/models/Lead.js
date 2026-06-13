@@ -5,7 +5,7 @@ const leadSchema = new mongoose.Schema(
     collaboratorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false,
     },
     customerName: {
       type: String,
