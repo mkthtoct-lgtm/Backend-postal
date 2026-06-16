@@ -11,15 +11,31 @@ class AuditLogService {
    */
   async log(userId, action, target, metadata = {}) {
     try {
-      // Thực hiện lưu log bất đồng bộ
-      const logEntry = new AuditLog({
-        userId,
-        action,
-        target,
-        metadata,
-      });
-      await logEntry.save();
-      console.log(`[AuditLog] Đã lưu log thành công: ${action} bởi user ${userId}`);
+      const isLoginAction = action === 'auth.login';
+      let shouldLog = isLoginAction;
+
+      // Nếu không phải hành động đăng nhập, kiểm tra xem người thực hiện có phải là Admin không
+      if (!shouldLog && userId) {
+        const User = require('../models/User');
+        const user = await User.findById(userId).populate('roleId');
+        if (user && user.roleId && user.roleId.slug === 'admin') {
+          shouldLog = true;
+        }
+      }
+
+      if (shouldLog) {
+        // Thực hiện lưu log bất đồng bộ
+        const logEntry = new AuditLog({
+          userId,
+          action,
+          target,
+          metadata,
+        });
+        await logEntry.save();
+        console.log(`[AuditLog] Đã lưu log thành công: ${action} bởi user ${userId}`);
+      } else {
+        console.log(`[AuditLog Skip] Bỏ qua log hành động: ${action} bởi user ${userId} (Không phải Admin và không phải Đăng nhập)`);
+      }
     } catch (error) {
       console.error('[AuditLog Error] Lỗi khi ghi nhận lịch sử thao tác:', error.message);
     }
@@ -50,10 +66,29 @@ class AuditLogService {
       }
     }
 
-    // Lấy toàn bộ danh sách, sắp xếp thời gian mới nhất lên đầu
-    return await AuditLog.find(query)
+    // Đọc các giá trị phân trang (mặc định limit = 100)
+    const limit = filters.limit ? parseInt(filters.limit, 10) : 100;
+    const page = filters.page ? parseInt(filters.page, 10) : 1;
+    const skip = (page - 1) * limit;
+
+    // Đếm tổng số bản ghi và tính số lượng trang
+    const totalLogs = await AuditLog.countDocuments(query);
+    const totalPages = Math.ceil(totalLogs / limit);
+
+    // Lấy danh sách logs theo phân trang, sắp xếp thời gian mới nhất lên đầu
+    const logs = await AuditLog.find(query)
       .populate('userId', 'fullName email')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    return {
+      logs,
+      totalLogs,
+      totalPages,
+      currentPage: page,
+      limit,
+    };
   }
 
   /**

@@ -34,13 +34,21 @@ class AuditLogController {
    */
   async getAllLogs(req, res) {
     try {
-      const { userId, action, from, to } = req.query;
+      const { userId, action, from, to, page, limit } = req.query;
 
-      const logs = await auditLogService.findAll({
+      const {
+        logs,
+        totalLogs,
+        totalPages,
+        currentPage,
+        limit: appliedLimit,
+      } = await auditLogService.findAll({
         userId,
         action,
         from,
         to,
+        page,
+        limit,
       });
 
       const formattedLogs = logs.map(formatAuditLog);
@@ -48,7 +56,15 @@ class AuditLogController {
       return res.status(200).json({
         success: true,
         message: 'Lấy danh sách lịch sử thao tác thành công.',
-        data: formattedLogs,
+        data: {
+          logs: formattedLogs,
+          pagination: {
+            totalLogs,
+            totalPages,
+            currentPage,
+            limit: appliedLimit,
+          },
+        },
       });
     } catch (error) {
       console.error('Error in getAllLogs:', error);
