@@ -54,6 +54,8 @@ const toCleanUserResponse = (user) => {
     roleId: user.roleId ? (user.roleId._id || user.roleId) : null,
     departmentId: user.departmentId || null,
     status: user.status,
+    hasSeenAdminTutorial: user.hasSeenAdminTutorial || false,
+    seenTours: user.seenTours || [],
     dealCount: user.dealCount || 0,
     lastLoginAt: user.lastLoginAt || null,
     createdAt: user.createdAt,
@@ -287,7 +289,7 @@ class UserController {
   async updateUser(req, res) {
     try {
       const { id } = req.params;
-      const { email, fullName, phone, status, roleId, departmentId, socialLink, zaloLink, instagramLink, city, ward, addressDetail, avatarUrl, bannerUrl } = req.body;
+      const { email, fullName, phone, status, roleId, departmentId, socialLink, zaloLink, instagramLink, city, ward, addressDetail, avatarUrl, bannerUrl, hasSeenAdminTutorial, seenTours } = req.body;
 
       // Kiểm tra định dạng ObjectId
       if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -326,6 +328,14 @@ class UserController {
       }
 
       const updateData = {};
+
+      if (hasSeenAdminTutorial !== undefined) {
+        updateData.hasSeenAdminTutorial = Boolean(hasSeenAdminTutorial);
+      }
+
+      if (seenTours !== undefined) {
+        updateData.seenTours = Array.isArray(seenTours) ? seenTours : [];
+      }
 
       // Xử lý các tệp tải lên nếu có (avatar, banner)
       if (req.files) {
@@ -366,6 +376,17 @@ class UserController {
           });
         }
         updateData.roleId = new mongoose.Types.ObjectId(roleId);
+
+        // reset cờ tutorial nếu vai trò mới là Admin
+        try {
+          const Role = require('../models/Role');
+          const newRole = await Role.findById(roleId);
+          if (newRole && (newRole.slug === 'admin' || newRole.name.toLowerCase() === 'admin')) {
+            updateData.hasSeenAdminTutorial = false;
+          }
+        } catch (err) {
+          console.error('Lỗi khi kiểm tra vai trò mới:', err);
+        }
       }
 
       // Ép kiểu và kiểm duyệt tính hợp lệ của departmentId
