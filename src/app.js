@@ -18,7 +18,16 @@ const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://hubportal-eight.vercel.app', 
+    'http://localhost:5173',               
+    'http://localhost:3000'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+}));
 app.use(express.json());
 
 // Cấu hình phục vụ file tĩnh vật lý từ thư mục /uploads
