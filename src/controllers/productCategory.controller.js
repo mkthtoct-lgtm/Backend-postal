@@ -3,6 +3,26 @@ const fs = require('fs');
 const path = require('path');
 const productCategoryService = require('../services/productCategory.service');
 
+/**
+ * Chuẩn hóa URL ảnh về dạng relative path (/uploads/...)
+ * Tránh lưu full URL localhost hoặc domain nội bộ vào database
+ */
+function sanitizeImageUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+
+  // Nếu đã là relative path → giữ nguyên
+  if (url.startsWith('/uploads/')) return url;
+
+  // Nếu là URL tuyệt đối chứa /uploads/ → cắt bỏ domain, giữ lại path
+  const match = url.match(/(\/uploads\/.+)/);
+  if (match) return match[1];
+
+  // Nếu là URL ngoài thực sự (Unsplash, CDN, ...) → giữ nguyên
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+
+  return url;
+}
+
 // Hàm xử lý base64 image
 function saveBase64Image(base64Str) {
   try {
@@ -68,7 +88,7 @@ class ProductCategoryController {
       } else if (coverImageUrl && coverImageUrl.startsWith('/uploads/')) {
         savedCoverImageUrl = coverImageUrl;
       } else if (coverImageUrl && coverImageUrl.startsWith('http')) {
-        savedCoverImageUrl = coverImageUrl;
+        savedCoverImageUrl = sanitizeImageUrl(coverImageUrl);
       }
 
       // Xử lý file upload từ multer
@@ -150,8 +170,9 @@ class ProductCategoryController {
         updateData.coverImageUrl = coverImageUrl;
         updateData.image = coverImageUrl;
       } else if (coverImageUrl && coverImageUrl.startsWith('http')) {
-        updateData.coverImageUrl = coverImageUrl;
-        updateData.image = coverImageUrl;
+        const sanitized = sanitizeImageUrl(coverImageUrl);
+        updateData.coverImageUrl = sanitized;
+        updateData.image = sanitized;
       }
 
       // Xử lý file upload từ multer
