@@ -1,5 +1,33 @@
 const mongoose = require('mongoose');
+const fs = require('fs');
+const path = require('path');
 const productCategoryService = require('../services/productCategory.service');
+
+// Hàm xử lý base64 image
+function saveBase64Image(base64Str) {
+  try {
+    if (!base64Str || typeof base64Str !== 'string' || !base64Str.startsWith('data:')) {
+      return null;
+    }
+    const matches = base64Str.match(/^data:image\/([A-Za-z+-]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return null;
+    }
+    const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+    const data = Buffer.from(matches[2], 'base64');
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const filename = `${uniqueSuffix}-cover.${ext}`;
+    const uploadDir = path.join(__dirname, '../../uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    fs.writeFileSync(path.join(uploadDir, filename), data);
+    return `/uploads/${filename}`;
+  } catch (error) {
+    console.error('Error saving base64 image:', error);
+    return null;
+  }
+}
 
 class ProductCategoryController {
   /**
@@ -28,7 +56,30 @@ class ProductCategoryController {
    */
   async createCategory(req, res) {
     try {
-      const { name, description, status } = req.body;
+      const { name, description, status, coverImageUrl } = req.body || {};
+      let savedCoverImageUrl = '';
+
+      // Xử lý ảnh từ base64 string
+      if (coverImageUrl && coverImageUrl.startsWith('data:')) {
+        const savedPath = saveBase64Image(coverImageUrl);
+        if (savedPath) {
+          savedCoverImageUrl = savedPath;
+        }
+      } else if (coverImageUrl && coverImageUrl.startsWith('/uploads/')) {
+        savedCoverImageUrl = coverImageUrl;
+      } else if (coverImageUrl && coverImageUrl.startsWith('http')) {
+        savedCoverImageUrl = coverImageUrl;
+      }
+
+      // Xử lý file upload từ multer
+      if (req.files) {
+        if (req.files['coverImage'] && req.files['coverImage'][0]) {
+          savedCoverImageUrl = `/uploads/${req.files['coverImage'][0].filename}`;
+        }
+        if (req.files['image'] && req.files['image'][0] && !savedCoverImageUrl) {
+          savedCoverImageUrl = `/uploads/${req.files['image'][0].filename}`;
+        }
+      }
 
       if (!name || !name.trim()) {
         return res.status(400).json({
@@ -37,7 +88,6 @@ class ProductCategoryController {
         });
       }
 
-      // Kiểm duyệt trùng lặp tên
       const existingCategory = await productCategoryService.findByName(name);
       if (existingCategory) {
         return res.status(400).json({
@@ -46,7 +96,17 @@ class ProductCategoryController {
         });
       }
 
-      const newCategory = await productCategoryService.create({ name, description, status });
+      // Validate status
+      const validStatuses = ['active', 'inactive', 'coming_soon', 'hidden'];
+      const finalStatus = status && validStatuses.includes(status) ? status : 'active';
+
+      const newCategory = await productCategoryService.create({
+        name,
+        description,
+        status: finalStatus,
+        coverImageUrl: savedCoverImageUrl,
+        image: savedCoverImageUrl
+      });
 
       return res.status(201).json({
         success: true,
@@ -69,28 +129,57 @@ class ProductCategoryController {
   async updateCategory(req, res) {
     try {
       const { id } = req.params;
-      const { name, description, status } = req.body;
+      const { name, description, status, coverImageUrl } = req.body || {};
+      
+      const updateData = { name, description };
+
+      // Validate and set status
+      const validStatuses = ['active', 'inactive', 'coming_soon', 'hidden'];
+      if (status && validStatuses.includes(status)) {
+        updateData.status = status;
+      }
+
+      // Xử lý ảnh từ base64 string
+      if (coverImageUrl && coverImageUrl.startsWith('data:')) {
+        const savedPath = saveBase64Image(coverImageUrl);
+        if (savedPath) {
+          updateData.coverImageUrl = savedPath;
+          updateData.image = savedPath;
+        }
+      } else if (coverImageUrl && coverImageUrl.startsWith('/uploads/')) {
+        updateData.coverImageUrl = coverImageUrl;
+        updateData.image = coverImageUrl;
+      } else if (coverImageUrl && coverImageUrl.startsWith('http')) {
+        updateData.coverImageUrl = coverImageUrl;
+        updateData.image = coverImageUrl;
+      }
+
+      // Xử lý file upload từ multer
+      if (req.files) {
+        if (req.files['coverImage'] && req.files['coverImage'][0]) {
+          updateData.coverImageUrl = `/uploads/${req.files['coverImage'][0].filename}`;
+          updateData.image = `/uploads/${req.files['coverImage'][0].filename}`;
+        }
+        if (req.files['image'] && req.files['image'][0]) {
+          updateData.image = `/uploads/${req.files['image'][0].filename}`;
+          if (!updateData.coverImageUrl) {
+            updateData.coverImageUrl = `/uploads/${req.files['image'][0].filename}`;
+          }
+        }
+      }
 
       if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({
-          success: false,
-          message: 'ID danh mục sản phẩm không hợp lệ.',
-        });
+        return res.status(400).json({ success: false, message: 'ID không hợp lệ.' });
       }
 
-      // Kiểm tra danh mục có tồn tại hay không
       const category = await productCategoryService.findById(id);
       if (!category) {
-        return res.status(404).json({
-          success: false,
-          message: 'Danh mục sản phẩm không tồn tại.',
-        });
+        return res.status(404).json({ success: false, message: 'Danh mục không tồn tại.' });
       }
 
-      // Kiểm duyệt trùng tên với danh mục khác khi thực hiện đổi tên
       if (name && name.trim().toLowerCase() !== category.name.toLowerCase()) {
         const existingCategory = await productCategoryService.findByName(name);
-        if (existingCategory) {
+        if (existingCategory && existingCategory._id.toString() !== id) {
           return res.status(400).json({
             success: false,
             message: 'Tên danh mục sản phẩm này đã tồn tại ở một danh mục khác.',
@@ -98,7 +187,7 @@ class ProductCategoryController {
         }
       }
 
-      const updatedCategory = await productCategoryService.update(id, { name, description, status });
+      const updatedCategory = await productCategoryService.update(id, updateData);
 
       return res.status(200).json({
         success: true,

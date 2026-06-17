@@ -7,21 +7,14 @@ class ProductService {
    * Hỗ trợ tìm kiếm theo tên/mô tả và lọc theo categoryId, trạng thái
    */
   async findAll({ search = '', categoryId = '', isActive } = {}) {
-    // Chỉ lấy sản phẩm chưa bị xóa mềm (deletedAt = null) VÀ isActive = true
-    // Các record cũ trong DB không có deletedAt → dùng $or để bắt cả 2 trường hợp
     const filter = {
       $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
     };
 
-    // Lọc theo isActive nếu được truyền vào
+    // Lọc theo isActive nếu được truyền vào rõ ràng (true/false)
+    // Nếu không truyền (undefined) → lấy tất cả kể cả sản phẩm đã ẩn
     if (isActive !== undefined) {
       filter.isActive = isActive;
-    } else {
-      // Mặc định chỉ lấy sản phẩm đang hoạt động
-      filter.$and = filter.$and || [];
-      filter.$and.push({
-        $or: [{ isActive: true }, { isActive: { $exists: false } }],
-      });
     }
 
     if (categoryId) {
