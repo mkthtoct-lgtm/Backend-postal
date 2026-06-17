@@ -5,17 +5,32 @@ const upload = require('../middlewares/upload');
 
 const router = express.Router();
 
-// Middleware kiểm tra quyền Admin
+// Middleware kiểm tra quyền quản lý sản phẩm
+// Cho phép: Admin, Ban giám đốc, Trưởng bộ phận
 const adminOnlyMiddleware = (req, res, next) => {
-  const ADMIN_ROLE_ID = '69fc5af582ef85451120772a';
-  if (req.user && req.user.roleId === ADMIN_ROLE_ID) {
-    next();
-  } else {
-    return res.status(403).json({
-      success: false,
-      message: 'Từ chối truy cập: Bạn không có quyền quản lý sản phẩm.',
-    });
+  const ALLOWED_ROLE_IDS = [
+    '69fc5af582ef85451120772a', // admin
+    '69fc5af582ef85451120772b', // bangiamdoc
+    '69fc5af582ef85451120772c', // truongbophan
+  ];
+  if (req.user && ALLOWED_ROLE_IDS.includes(req.user.roleId)) {
+    return next();
   }
+  return res.status(403).json({
+    success: false,
+    message: 'Từ chối truy cập: Bạn không có quyền quản lý sản phẩm.',
+  });
+};
+
+// Middleware đánh dấu có phải manager không (không chặn, chỉ ghi nhận)
+const markManagerMiddleware = (req, res, next) => {
+  const ALLOWED_ROLE_IDS = [
+    '69fc5af582ef85451120772a',
+    '69fc5af582ef85451120772b',
+    '69fc5af582ef85451120772c',
+  ];
+  req.isManager = !!(req.user && ALLOWED_ROLE_IDS.includes(req.user.roleId));
+  next();
 };
 
 /**
@@ -72,42 +87,21 @@ const adminOnlyMiddleware = (req, res, next) => {
  *       401:
  *         description: Chưa đăng nhập hoặc token không hợp lệ
  */
-router.get('/', authMiddleware, productController.getAll);
+router.get('/', authMiddleware, markManagerMiddleware, (req, res, next) => {
+  // Manager thấy tất cả sản phẩm kể cả đã ẩn
+  // User thường chỉ thấy sản phẩm đang active
+  if (!req.isManager && req.query.isActive === undefined) {
+    req.query.isActive = 'true';
+  }
+  next();
+}, productController.getAll);
 
-/**
- * @swagger
- * /products/{id}:
- *   get:
- *     summary: Lấy chi tiết sản phẩm theo ID
- *     tags: [Products]
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: MongoDB ID của sản phẩm
- *     responses:
- *       200:
- *         description: Lấy chi tiết sản phẩm thành công
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                 data:
- *                   $ref: '#/components/schemas/Product'
- *       404:
- *         description: Không tìm thấy sản phẩm
- */
-router.get('/:id', authMiddleware, productController.getById);
+router.get('/:id', authMiddleware, markManagerMiddleware, (req, res, next) => {
+  if (!req.isManager) {
+    req.query._restrictHidden = 'true';
+  }
+  next();
+}, productController.getById);
 
 /**
  * @swagger

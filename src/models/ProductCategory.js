@@ -13,10 +13,20 @@ const productCategorySchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    coverImageUrl: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    image: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     status: {
       type: String,
-      enum: ['active', 'inactive', 'suspended'],
-      default: 'active',
+      enum: ['active', 'inactive', 'coming_soon', 'hidden'],
+      default: 'active',  // Đảm bảo luôn có giá trị
     },
     deletedAt: {
       type: Date,
@@ -24,7 +34,7 @@ const productCategorySchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true, // Tự động tạo và cập nhật các trường createdAt và updatedAt
+    timestamps: true,
   }
 );
 
