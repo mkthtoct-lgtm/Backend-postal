@@ -46,6 +46,14 @@ class ProductController {
         });
       }
 
+      // User thường không được xem sản phẩm đã ẩn
+      if (req.query._restrictHidden === 'true' && product.isActive === false) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy sản phẩm.',
+        });
+      }
+
       return res.status(200).json({
         success: true,
         message: 'Lấy chi tiết sản phẩm thành công.',
