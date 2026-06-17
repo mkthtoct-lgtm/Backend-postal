@@ -92,6 +92,14 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    hasSeenAdminTutorial: {
+      type: Boolean,
+      default: false,
+    },
+    seenTours: {
+      type: [String],
+      default: [],
+    },
     deletedAt: {
       type: Date,
       default: null,

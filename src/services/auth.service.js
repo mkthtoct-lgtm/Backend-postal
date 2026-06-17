@@ -308,6 +308,8 @@ class AuthService {
       roleId: user.roleId ? user.roleId.toString() : null,
       departmentId: user.departmentId ? user.departmentId.toString() : null,
       status: user.status,
+      hasSeenAdminTutorial: user.hasSeenAdminTutorial || false,
+      seenTours: user.seenTours || [],
       referral_code: user.referral_code || null,
       referral_code_user: user.referral_code_user || null,
     };
