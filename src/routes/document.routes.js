@@ -5,6 +5,8 @@ const checkPermission = require('../middlewares/checkPermission');
 const upload = require('../middlewares/upload');
 const multer = require('multer');
 const googleDriveService = require('../services/googleDrive.service');
+const mongoose = require('mongoose');
+const documentCategoryService = require('../services/documentCategory.service');
 
 // Cấu hình lưu trữ bộ nhớ RAM tạm thời phục vụ tải lên Google Drive
 const storage = multer.memoryStorage();
@@ -334,8 +336,31 @@ router.post('/upload', authMiddleware, checkPermission('documents:write'), uploa
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp file cần tải lên.' });
     }
 
+    const { categoryId } = req.body;
+    let parentFolderId = null;
+
+    if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
+      const category = await documentCategoryService.findById(categoryId);
+      if (category) {
+        if (category.googleDriveFolderId) {
+          parentFolderId = category.googleDriveFolderId;
+        } else {
+          // Tạo thư mục mới trên Google Drive
+          try {
+            parentFolderId = await googleDriveService.createFolder(category.name);
+            // Cập nhật lại vào DocumentCategory
+            await documentCategoryService.update(categoryId, { googleDriveFolderId: parentFolderId });
+          } catch (folderError) {
+            console.error('Lỗi tự động tạo thư mục danh mục trên Google Drive:', folderError);
+            // Fallback về thư mục gốc nếu tạo lỗi
+            parentFolderId = null;
+          }
+        }
+      }
+    }
+
     // Tải file trực tiếp lên Google Drive
-    const uploadResult = await googleDriveService.uploadFile(req.file);
+    const uploadResult = await googleDriveService.uploadFile(req.file, parentFolderId);
 
     return res.status(200).json({
       success: true,
