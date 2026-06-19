@@ -6,7 +6,7 @@ class CrmService {
    */
   async forwardToBizFly(lead) {
     try {
-      const webhookUrl = process.env.BIZFLY_WEBHOOK_URL || 'https://crm.bizfly.vn/public-api/public/webhook?id=69817a9fcb3a7316800eb4dd&crm_token=e198cc9301ec0e922b2140364576b05e5e240ba5&project_id=695b85c8320583313135ddfa';
+      const webhookUrl = process.env.BIZFLY_WEBHOOK_URL || 'https://crm.bizfly.vn/public-api/public/webhook?id=6a2b72434cee0da9cf07775e&crm_token=c6a5a2b4af9dcb0806470a2ae859234006f2d050&project_id=695b85c8320583313135ddfa';
 
       const payload = {
         name: lead.customerName,
