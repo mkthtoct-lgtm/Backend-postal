@@ -14,13 +14,17 @@ class LeadController {
         phone,
         email,
         source,
+        sourceChannel, // Bổ sung để hỗ trợ tên trường từ Frontend
         productInterest,
+        productName, // Bổ sung để hỗ trợ tên trường từ Frontend
         countryInterest,
+        country, // Bổ sung để hỗ trợ tên trường từ Frontend
         budgetRange,
         urgency,
         preferredContact,
         note,
-        status
+        status,
+        productId // Bổ sung để hỗ trợ định danh sản phẩm chi tiết
       } = req.body;
 
       if (!customerName || !phone) {
@@ -46,15 +50,32 @@ class LeadController {
         }
       }
 
+      // Xác định tên sản phẩm và quốc gia quan tâm dựa trên thông tin gửi lên hoặc truy vấn DB
+      let finalProductInterest = productInterest || productName || 'Du học Đức';
+      let finalCountryInterest = countryInterest || country || 'Đức';
+
+      if (productId && mongoose.Types.ObjectId.isValid(productId)) {
+        try {
+          const Product = require('../models/Product');
+          const product = await Product.findOne({ _id: productId, deletedAt: null }).lean();
+          if (product) {
+            finalProductInterest = product.name;
+            finalCountryInterest = product.country || finalCountryInterest;
+          }
+        } catch (dbErr) {
+          console.error('[LeadController] Lỗi khi tìm kiếm thông tin sản phẩm bằng productId:', dbErr.message);
+        }
+      }
+
       // 1. Lưu trữ thông tin lead cục bộ dưới trạng thái mặc định "dang_tu_van" hoặc trạng thái gửi từ body
       const leadData = {
         collaboratorId,
         customerName: customerName.trim(),
         phone: phone.trim(),
         email: email ? email.trim() : '',
-        source: source || 'Website',
-        productInterest: productInterest || 'Du học Đức',
-        countryInterest: countryInterest || 'Đức',
+        source: source || sourceChannel || 'Website',
+        productInterest: finalProductInterest,
+        countryInterest: finalCountryInterest,
         budgetRange: budgetRange ? budgetRange.trim() : '',
         urgency: urgency || 'Trong 1-3 tháng',
         preferredContact: preferredContact || 'Zalo/Điện thoại',
