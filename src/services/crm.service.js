@@ -8,6 +8,25 @@ class CrmService {
     try {
       const webhookUrl = process.env.BIZFLY_WEBHOOK_URL || 'https://crm.bizfly.vn/public-api/public/webhook?id=6a2b72434cee0da9cf07775e&crm_token=c6a5a2b4af9dcb0806470a2ae859234006f2d050&project_id=695b85c8320583313135ddfa';
 
+      // Trích xuất thông tin Cộng tác viên / Người giới thiệu từ database
+      let collaborator = null;
+      if (lead.collaboratorId) {
+        try {
+          const User = require('../models/User');
+          collaborator = await User.findById(lead.collaboratorId).lean();
+        } catch (dbErr) {
+          console.error('[CrmService] Lỗi khi truy vấn thông tin CTV từ db:', dbErr.message);
+        }
+      }
+
+      const collaboratorName = collaborator && collaborator.fullName 
+        ? collaborator.fullName 
+        : 'Khách đăng ký trực tiếp';
+      
+      const collaboratorInfo = collaborator && collaborator.fullName
+        ? `${collaborator.fullName} (Email: ${collaborator.email || 'N/A'}, SĐT: ${collaborator.phone || 'N/A'})`
+        : 'Khách đăng ký trực tiếp';
+
       const payload = {
         name: lead.customerName,
         fullname: lead.customerName,
@@ -20,7 +39,8 @@ class CrmService {
         urgency: lead.urgency,
         preferred_contact: lead.preferredContact,
         note: lead.note,
-        description: `Dịch vụ quan tâm: ${lead.productInterest}. Quốc gia: ${lead.countryInterest}. Ngân sách: ${lead.budgetRange}. Mức độ cấp thiết: ${lead.urgency}. Kênh liên hệ: ${lead.preferredContact}. Ghi chú CTV: ${lead.note}`
+        collaborator_name: collaboratorName,
+        description: `Dịch vụ quan tâm: ${lead.productInterest}. Quốc gia: ${lead.countryInterest}. Ngân sách: ${lead.budgetRange}. Mức độ cấp thiết: ${lead.urgency}. Kênh liên hệ: ${lead.preferredContact}. Ghi chú CTV: ${lead.note}. Người giới thiệu: ${collaboratorInfo}`
       };
 
       console.log(`[Bizfly CRM] Bắt đầu đẩy lead lên BizFly...`, payload);
