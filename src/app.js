@@ -18,16 +18,33 @@ const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 
 const app = express();
 
+// CORS Configuration - SỬA LẠI
 app.use(cors({
-  origin: [
-    'https://hubportal-eight.vercel.app', 
-    'http://localhost:5173',               
-    'http://localhost:3000'
-  ],
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'https://hubportal-eight.vercel.app',
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://api.hto.edu.vn'
+    ];
+    // Cho phép requests không có origin (như mobile apps, curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Tạm thời cho phép tất cả trong dev
+      // callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
 }));
+
+// THÊM: Xử lý preflight requests
+app.options('*', cors());
+
 app.use(express.json());
 
 // Cấu hình phục vụ file tĩnh vật lý từ thư mục /uploads
@@ -38,37 +55,17 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 // Khai báo định tuyến cho hệ thống xác thực (Auth)
 app.use('/api/v1/auth', authRoutes);
-
-// Khai báo định tuyến cho hệ thống quản lý Người dùng (Users)
 app.use('/api/v1/users', userRoutes);
-
-// Khai báo định tuyến cho hệ thống Danh mục Tài liệu (Document Categories)
 app.use('/api/v1/document-categories', documentCategoryRoutes);
-
-// Khai báo định tuyến cho hệ thống Tài liệu & Biểu mẫu (Documents)
 app.use('/api/v1/documents', documentRoutes);
-
-// Khai báo định tuyến cho hệ thống Danh mục Sản phẩm (Product Categories)
 app.use('/api/v1/product-categories', productCategoryRoutes);
-
-// Khai báo định tuyến cho hệ thống Phòng ban (Departments)
 app.use('/api/v1/departments', departmentRoutes);
-
-// Khai báo định tuyến cho hệ thống Lịch sử thao tác (Audit Logs)
 app.use('/api/v1/audit-logs', auditLogRoutes);
-
-// Khai báo định tuyến cho hệ thống Thông báo nội bộ (Notifications)
 app.use('/api/v1/notifications', notificationRoutes);
-
-// Khai báo định tuyến cho Dashboard (theo role)
 app.use('/api/v1/dashboard', dashboardRoutes);
-// Khai báo định tuyến cho hệ thống JD công việc (Job Descriptions)
 app.use('/api/v1/job-descriptions', jobDescriptionRoutes);
-// Khai báo định tuyến cho hệ thống Tin tức & Sự kiện (News & Events)
 app.use('/api/v1/news-posts', newsPostRoutes);
-// Khai báo định tuyến cho hệ thống Sản phẩm dịch vụ (Products)
 app.use('/api/v1/products', productRoutes);
-// Khai báo định tuyến cho hệ thống Leads & CRM (Leads)
 app.use('/api/v1/leads', leadRoutes);
 
 app.get('/', (req, res) => {

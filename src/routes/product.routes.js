@@ -1,7 +1,6 @@
 const express = require('express');
 const productController = require('../controllers/product.controller');
 const authMiddleware = require('../middlewares/auth');
-const upload = require('../middlewares/upload');
 
 const router = express.Router();
 
@@ -149,7 +148,7 @@ router.get('/:id', authMiddleware, markManagerMiddleware, (req, res, next) => {
  *       403:
  *         description: Không có quyền truy cập (Không phải Admin)
  */
-router.post('/', authMiddleware, adminOnlyMiddleware, upload.single('image'), productController.create);
+router.post('/', authMiddleware, adminOnlyMiddleware, productController.create);
 
 /**
  * @swagger
@@ -194,7 +193,7 @@ router.post('/', authMiddleware, adminOnlyMiddleware, upload.single('image'), pr
  *       404:
  *         description: Không tìm thấy sản phẩm
  */
-router.patch('/:id', authMiddleware, adminOnlyMiddleware, upload.single('image'), productController.update);
+router.patch('/:id', authMiddleware, adminOnlyMiddleware, productController.update);
 
 /**
  * @swagger

@@ -77,10 +77,8 @@ class ProductController {
     try {
       const data = { ...req.body };
 
-      // Nếu có file upload, ưu tiên dùng đường dẫn file vừa lưu
-      if (req.file) {
-        data.image = `/uploads/${req.file.filename}`;
-      }
+      // Nhận ảnh dưới dạng base64 string trực tiếp từ body (data:image/... hoặc URL)
+      // Không cần xử lý req.file nữa
 
       // Chuyển đổi kiểu dữ liệu cho các field array/object nếu gửi dạng JSON string
       if (typeof data.requirements === 'string') {
@@ -118,9 +116,8 @@ class ProductController {
       const { id } = req.params;
       const data = { ...req.body };
 
-      if (req.file) {
-        data.image = `/uploads/${req.file.filename}`;
-      }
+      // Nhận ảnh dưới dạng base64 string trực tiếp từ body (data:image/... hoặc URL)
+      // Không cần xử lý req.file nữa
 
       // Chuyển đổi kiểu dữ liệu cho các field array/object nếu gửi dạng JSON string
       if (typeof data.requirements === 'string') {

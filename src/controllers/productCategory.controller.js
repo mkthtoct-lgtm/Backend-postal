@@ -1,268 +1,186 @@
-const mongoose = require('mongoose');
-const fs = require('fs');
-const path = require('path');
-const productCategoryService = require('../services/productCategory.service');
+const productService = require('../services/product.service');
 
-/**
- * Chuẩn hóa URL ảnh về dạng relative path (/uploads/...)
- * Tránh lưu full URL localhost hoặc domain nội bộ vào database
- */
-function sanitizeImageUrl(url) {
-  if (!url || typeof url !== 'string') return '';
-
-  // Nếu đã là relative path → giữ nguyên
-  if (url.startsWith('/uploads/')) return url;
-
-  // Nếu là URL tuyệt đối chứa /uploads/ → cắt bỏ domain, giữ lại path
-  const match = url.match(/(\/uploads\/.+)/);
-  if (match) return match[1];
-
-  // Nếu là URL ngoài thực sự (Unsplash, CDN, ...) → giữ nguyên
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-
-  return url;
-}
-
-// Hàm xử lý base64 image
-function saveBase64Image(base64Str) {
-  try {
-    if (!base64Str || typeof base64Str !== 'string' || !base64Str.startsWith('data:')) {
-      return null;
-    }
-    const matches = base64Str.match(/^data:image\/([A-Za-z+-]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      return null;
-    }
-    const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
-    const data = Buffer.from(matches[2], 'base64');
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const filename = `${uniqueSuffix}-cover.${ext}`;
-    const uploadDir = path.join(__dirname, '../../uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    fs.writeFileSync(path.join(uploadDir, filename), data);
-    return `/uploads/${filename}`;
-  } catch (error) {
-    console.error('Error saving base64 image:', error);
-    return null;
-  }
-}
-
-class ProductCategoryController {
+class ProductController {
   /**
-   * Lấy danh sách toàn bộ danh mục sản phẩm chưa bị xóa mềm
+   * Lấy toàn bộ danh sách sản phẩm (có tìm kiếm và lọc)
+   * GET /products?search=&categoryId=&isActive=
    */
-  async getAllCategories(req, res) {
+  async getAll(req, res) {
     try {
-      const categories = await productCategoryService.findAll();
+      const { search, categoryId, isActive } = req.query;
+
+      // Chuyển đổi isActive từ string sang boolean nếu có
+      let isActiveParsed;
+      if (isActive === 'true') isActiveParsed = true;
+      else if (isActive === 'false') isActiveParsed = false;
+
+      const products = await productService.findAll({ search, categoryId, isActive: isActiveParsed });
+
       return res.status(200).json({
         success: true,
-        message: 'Lấy danh sách danh mục sản phẩm thành công.',
-        data: categories,
+        message: 'Lấy danh sách sản phẩm thành công.',
+        data: products,
       });
     } catch (error) {
-      console.error('Error in getAllCategories:', error);
       return res.status(500).json({
         success: false,
-        message: 'Lỗi máy chủ khi lấy danh sách danh mục sản phẩm.',
+        message: 'Lỗi máy chủ khi lấy danh sách sản phẩm.',
         error: error.message,
       });
     }
   }
 
   /**
-   * Tạo mới danh mục sản phẩm
+   * Lấy chi tiết sản phẩm theo ID
+   * GET /products/:id
    */
-  async createCategory(req, res) {
+  async getById(req, res) {
     try {
-      const { name, description, status, coverImageUrl } = req.body || {};
-      let savedCoverImageUrl = '';
+      const { id } = req.params;
+      const product = await productService.findById(id);
 
-      // Xử lý ảnh từ base64 string
-      if (coverImageUrl && coverImageUrl.startsWith('data:')) {
-        const savedPath = saveBase64Image(coverImageUrl);
-        if (savedPath) {
-          savedCoverImageUrl = savedPath;
-        }
-      } else if (coverImageUrl && coverImageUrl.startsWith('/uploads/')) {
-        savedCoverImageUrl = coverImageUrl;
-      } else if (coverImageUrl && coverImageUrl.startsWith('http')) {
-        savedCoverImageUrl = sanitizeImageUrl(coverImageUrl);
-      }
-
-      // Xử lý file upload từ multer
-      if (req.files) {
-        if (req.files['coverImage'] && req.files['coverImage'][0]) {
-          savedCoverImageUrl = `/uploads/${req.files['coverImage'][0].filename}`;
-        }
-        if (req.files['image'] && req.files['image'][0] && !savedCoverImageUrl) {
-          savedCoverImageUrl = `/uploads/${req.files['image'][0].filename}`;
-        }
-      }
-
-      if (!name || !name.trim()) {
-        return res.status(400).json({
+      if (!product) {
+        return res.status(404).json({
           success: false,
-          message: 'Tên danh mục sản phẩm không được để trống.',
+          message: 'Không tìm thấy sản phẩm.',
         });
       }
 
-      const existingCategory = await productCategoryService.findByName(name);
-      if (existingCategory) {
-        return res.status(400).json({
+      // User thường không được xem sản phẩm đã ẩn
+      if (req.query._restrictHidden === 'true' && product.isActive === false) {
+        return res.status(404).json({
           success: false,
-          message: 'Tên danh mục sản phẩm này đã tồn tại trong hệ thống.',
+          message: 'Không tìm thấy sản phẩm.',
         });
       }
 
-      // Validate status
-      const validStatuses = ['active', 'inactive', 'coming_soon', 'hidden'];
-      const finalStatus = status && validStatuses.includes(status) ? status : 'active';
-
-      const newCategory = await productCategoryService.create({
-        name,
-        description,
-        status: finalStatus,
-        coverImageUrl: savedCoverImageUrl,
-        image: savedCoverImageUrl
+      return res.status(200).json({
+        success: true,
+        message: 'Lấy chi tiết sản phẩm thành công.',
+        data: product,
       });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi lấy chi tiết sản phẩm.',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Tạo sản phẩm mới (Chỉ Admin)
+   * POST /products
+   * Hỗ trợ upload ảnh (multipart, field "image") hoặc gửi sẵn URL ảnh trong body.image
+   */
+  async create(req, res) {
+    try {
+      const data = { ...req.body };
+
+      // Nhận ảnh dưới dạng base64 string trực tiếp từ body (data:image/... hoặc URL)
+      // Không cần xử lý req.file nữa
+
+      // Chuyển đổi kiểu dữ liệu cho các field array/object nếu gửi dạng JSON string
+      if (typeof data.requirements === 'string') {
+        try { data.requirements = JSON.parse(data.requirements); } catch { data.requirements = []; }
+      }
+      if (typeof data.costs === 'string') {
+        try { data.costs = JSON.parse(data.costs); } catch { data.costs = []; }
+      }
+      if (typeof data.steps === 'string') {
+        try { data.steps = JSON.parse(data.steps); } catch { data.steps = []; }
+      }
+
+      const product = await productService.create(data);
 
       return res.status(201).json({
         success: true,
-        message: 'Tạo danh mục sản phẩm thành công.',
-        data: newCategory,
+        message: 'Tạo sản phẩm thành công.',
+        data: product,
       });
     } catch (error) {
-      console.error('Error in createCategory:', error);
-      return res.status(500).json({
+      return res.status(400).json({
         success: false,
-        message: 'Lỗi máy chủ khi tạo mới danh mục sản phẩm.',
+        message: 'Lỗi khi tạo sản phẩm.',
         error: error.message,
       });
     }
   }
 
   /**
-   * Cập nhật thông tin chi tiết danh mục sản phẩm
+   * Cập nhật thông tin sản phẩm (Chỉ Admin)
+   * PATCH /products/:id
    */
-  async updateCategory(req, res) {
+  async update(req, res) {
     try {
       const { id } = req.params;
-      const { name, description, status, coverImageUrl } = req.body || {};
-      
-      const updateData = { name, description };
+      const data = { ...req.body };
 
-      // Validate and set status
-      const validStatuses = ['active', 'inactive', 'coming_soon', 'hidden'];
-      if (status && validStatuses.includes(status)) {
-        updateData.status = status;
+      // Nhận ảnh dưới dạng base64 string trực tiếp từ body (data:image/... hoặc URL)
+      // Không cần xử lý req.file nữa
+
+      // Chuyển đổi kiểu dữ liệu cho các field array/object nếu gửi dạng JSON string
+      if (typeof data.requirements === 'string') {
+        try { data.requirements = JSON.parse(data.requirements); } catch { data.requirements = []; }
+      }
+      if (typeof data.costs === 'string') {
+        try { data.costs = JSON.parse(data.costs); } catch { data.costs = []; }
+      }
+      if (typeof data.steps === 'string') {
+        try { data.steps = JSON.parse(data.steps); } catch { data.steps = []; }
       }
 
-      // Xử lý ảnh từ base64 string
-      if (coverImageUrl && coverImageUrl.startsWith('data:')) {
-        const savedPath = saveBase64Image(coverImageUrl);
-        if (savedPath) {
-          updateData.coverImageUrl = savedPath;
-          updateData.image = savedPath;
-        }
-      } else if (coverImageUrl && coverImageUrl.startsWith('/uploads/')) {
-        updateData.coverImageUrl = coverImageUrl;
-        updateData.image = coverImageUrl;
-      } else if (coverImageUrl && coverImageUrl.startsWith('http')) {
-        const sanitized = sanitizeImageUrl(coverImageUrl);
-        updateData.coverImageUrl = sanitized;
-        updateData.image = sanitized;
-      }
+      const product = await productService.update(id, data);
 
-      // Xử lý file upload từ multer
-      if (req.files) {
-        if (req.files['coverImage'] && req.files['coverImage'][0]) {
-          updateData.coverImageUrl = `/uploads/${req.files['coverImage'][0].filename}`;
-          updateData.image = `/uploads/${req.files['coverImage'][0].filename}`;
-        }
-        if (req.files['image'] && req.files['image'][0]) {
-          updateData.image = `/uploads/${req.files['image'][0].filename}`;
-          if (!updateData.coverImageUrl) {
-            updateData.coverImageUrl = `/uploads/${req.files['image'][0].filename}`;
-          }
-        }
-      }
-
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({ success: false, message: 'ID không hợp lệ.' });
-      }
-
-      const category = await productCategoryService.findById(id);
-      if (!category) {
-        return res.status(404).json({ success: false, message: 'Danh mục không tồn tại.' });
-      }
-
-      if (name && name.trim().toLowerCase() !== category.name.toLowerCase()) {
-        const existingCategory = await productCategoryService.findByName(name);
-        if (existingCategory && existingCategory._id.toString() !== id) {
-          return res.status(400).json({
-            success: false,
-            message: 'Tên danh mục sản phẩm này đã tồn tại ở một danh mục khác.',
-          });
-        }
-      }
-
-      const updatedCategory = await productCategoryService.update(id, updateData);
-
-      return res.status(200).json({
-        success: true,
-        message: 'Cập nhật danh mục sản phẩm thành công.',
-        data: updatedCategory,
-      });
-    } catch (error) {
-      console.error('Error in updateCategory:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Lỗi máy chủ khi cập nhật danh mục sản phẩm.',
-        error: error.message,
-      });
-    }
-  }
-
-  /**
-   * Xóa cứng danh mục sản phẩm khỏi database
-   */
-  async deleteCategory(req, res) {
-    try {
-      const { id } = req.params;
-
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({
-          success: false,
-          message: 'ID danh mục sản phẩm không hợp lệ.',
-        });
-      }
-
-      const category = await productCategoryService.findById(id);
-      if (!category) {
+      if (!product) {
         return res.status(404).json({
           success: false,
-          message: 'Danh mục sản phẩm không tồn tại.',
+          message: 'Không tìm thấy sản phẩm để cập nhật.',
         });
       }
 
-      // Xóa cứng khỏi database
-      await productCategoryService.hardDelete(id);
+      return res.status(200).json({
+        success: true,
+        message: 'Cập nhật sản phẩm thành công.',
+        data: product,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lỗi khi cập nhật sản phẩm.',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Xóa mềm sản phẩm (Chỉ Admin)
+   * DELETE /products/:id
+   */
+  async delete(req, res) {
+    try {
+      const { id } = req.params;
+      const product = await productService.delete(id);
+
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy sản phẩm để xóa.',
+        });
+      }
 
       return res.status(200).json({
         success: true,
-        message: 'Xóa danh mục sản phẩm thành công.',
+        message: 'Xóa sản phẩm thành công.',
       });
     } catch (error) {
-      console.error('Error in deleteCategory:', error);
       return res.status(500).json({
         success: false,
-        message: 'Lỗi máy chủ khi xóa danh mục sản phẩm.',
+        message: 'Lỗi máy chủ khi xóa sản phẩm.',
         error: error.message,
       });
     }
   }
 }
 
-module.exports = new ProductCategoryController();
+module.exports = new ProductController();

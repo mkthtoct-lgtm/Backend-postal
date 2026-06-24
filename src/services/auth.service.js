@@ -6,6 +6,7 @@ const mailService = require('./mail.service');
 const { signToken } = require('../utils/jwt');
 const RefreshToken = require('../models/RefreshToken');
 const PasswordResetToken = require('../models/PasswordResetToken');
+const Role = require('../models/Role');
 
 // Định cấu hình hằng số
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 phút
@@ -280,10 +281,27 @@ class AuthService {
     // Ký JWT access token
     const accessToken = signToken(payload);
 
+    // Lấy danh sách quyền được cấp từ Role (dùng cho frontend kiểm tra phân quyền UI)
+    let grantedPermissions = [];
+    try {
+      if (user.roleId) {
+        const role = await Role.findById(user.roleId).lean();
+        if (role?.permissions) {
+          // Lọc bỏ wildcard '*' — chỉ trả về quyền cụ thể (e.g. "view_product_details")
+          grantedPermissions = role.permissions.filter((p) => p !== '*');
+        }
+      }
+    } catch (err) {
+      console.warn('[AuthService] Không lấy được permissions từ Role:', err.message);
+    }
+
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
-      user,
+      user: {
+        ...user,
+        grantedPermissions,
+      },
     };
   }
 
