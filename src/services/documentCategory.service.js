@@ -55,6 +55,7 @@ class DocumentCategoryService {
     if (data.name !== undefined) updateData.name = data.name.trim();
     if (data.description !== undefined) updateData.description = data.description.trim();
     if (data.isHidden !== undefined) updateData.isHidden = data.isHidden;
+    if (data.googleDriveFolderId !== undefined) updateData.googleDriveFolderId = data.googleDriveFolderId;
 
     return await DocumentCategory.findOneAndUpdate(
       { _id: id, deletedAt: null },

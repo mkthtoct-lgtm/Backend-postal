@@ -18,6 +18,7 @@ const env = {
     FROM_NAME: process.env.MAIL_FROM_NAME || 'HITO CRM',
   },
   FRONTEND_URL: process.env.FRONTEND_URL || 'https://hubportal-eight.vercel.app',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
 };
 
 module.exports = env;

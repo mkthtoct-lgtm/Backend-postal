@@ -72,6 +72,37 @@ class ProductCategoryController {
   }
 
   /**
+   * Lấy chi tiết danh mục sản phẩm theo ID
+   */
+  async getCategoryById(req, res) {
+    try {
+      const { id } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ success: false, message: 'ID không hợp lệ.' });
+      }
+      const category = await productCategoryService.findById(id);
+      if (!category) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy danh mục sản phẩm.',
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        message: 'Lấy chi tiết danh mục sản phẩm thành công.',
+        data: category,
+      });
+    } catch (error) {
+      console.error('Error in getCategoryById:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi lấy chi tiết danh mục sản phẩm.',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
    * Tạo mới danh mục sản phẩm
    */
   async createCategory(req, res) {

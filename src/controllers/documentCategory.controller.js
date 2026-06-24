@@ -96,6 +96,16 @@ class DocumentCategoryController {
         }
       }
 
+      // Đổi tên thư mục tương ứng trên Google Drive nếu danh mục đã liên kết với thư mục Drive
+      if (name && name.trim() !== category.name && category.googleDriveFolderId) {
+        try {
+          const googleDriveService = require('../services/googleDrive.service');
+          await googleDriveService.renameFolder(category.googleDriveFolderId, name.trim());
+        } catch (driveError) {
+          console.error('Lỗi khi đổi tên thư mục tương ứng trên Google Drive:', driveError.message);
+        }
+      }
+
       const updatedCategory = await documentCategoryService.update(id, { name, description });
 
       return res.status(200).json({
