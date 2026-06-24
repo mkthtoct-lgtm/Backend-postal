@@ -33,14 +33,24 @@ class CrmService {
         phone: lead.phone,
         email: lead.email,
         source: lead.source,
+        note: lead.note,
+        description: `Dịch vụ quan tâm: ${lead.productInterest}. Quốc gia: ${lead.countryInterest}. Ngân sách: ${lead.budgetRange}. Mức độ cấp thiết: ${lead.urgency}. Kênh liên hệ: ${lead.preferredContact}. Ghi chú CTV: ${lead.note}. Người giới thiệu: ${collaboratorInfo}`,
+
+        // Định dạng snake_case
         product_interest: lead.productInterest,
         country_interest: lead.countryInterest,
         budget_range: lead.budgetRange,
         urgency: lead.urgency,
         preferred_contact: lead.preferredContact,
-        note: lead.note,
         collaborator_name: collaboratorName,
-        description: `Dịch vụ quan tâm: ${lead.productInterest}. Quốc gia: ${lead.countryInterest}. Ngân sách: ${lead.budgetRange}. Mức độ cấp thiết: ${lead.urgency}. Kênh liên hệ: ${lead.preferredContact}. Ghi chú CTV: ${lead.note}. Người giới thiệu: ${collaboratorInfo}`
+
+        // Định dạng camelCase (tương thích với mô tả hướng dẫn ở Frontend và cấu hình mapping CRM cũ)
+        customerName: lead.customerName,
+        productInterest: lead.productInterest,
+        countryInterest: lead.countryInterest,
+        budgetRange: lead.budgetRange,
+        preferredContact: lead.preferredContact,
+        collaboratorName: collaboratorName
       };
 
       console.log(`[Bizfly CRM] Bắt đầu đẩy lead lên BizFly...`, payload);

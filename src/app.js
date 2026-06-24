@@ -14,6 +14,8 @@ const jobDescriptionRoutes = require('./routes/jobDescription.routes');
 const newsPostRoutes = require('./routes/newsPost.routes');
 const productRoutes = require('./routes/product.routes');
 const leadRoutes = require('./routes/lead.routes');
+const chatRoutes = require('./routes/chat.routes');
+const commissionRoutes = require('./routes/commission.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 
 const app = express();
@@ -70,6 +72,10 @@ app.use('/api/v1/news-posts', newsPostRoutes);
 app.use('/api/v1/products', productRoutes);
 // Khai báo định tuyến cho hệ thống Leads & CRM (Leads)
 app.use('/api/v1/leads', leadRoutes);
+// Khai báo định tuyến cho hệ thống đối soát hoa hồng (Commissions)
+app.use('/api/v1/commissions', commissionRoutes);
+// Khai báo định tuyến cho hệ thống Chatbot với Google Gemini AI
+app.use('/api/v1/chat', chatRoutes);
 
 app.get('/', (req, res) => {
   res.json({

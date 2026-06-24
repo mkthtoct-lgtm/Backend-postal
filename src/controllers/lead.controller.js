@@ -236,6 +236,16 @@ class LeadController {
       const oldStatus = lead.status;
       const updatedLead = await leadService.updateStatus(id, status);
 
+      // Nếu trạng thái chuyển sang 'xu_ly_ho_so' (deal thành công), tự động tính toán hoa hồng cho CTV giới thiệu
+      if (status === 'xu_ly_ho_so' && oldStatus !== 'xu_ly_ho_so') {
+        try {
+          const commissionService = require('../services/commission.service');
+          await commissionService.calculateCommission(id);
+        } catch (commErr) {
+          console.error('[LeadController] Lỗi khi tự động tính hoa hồng đơn hàng:', commErr.message);
+        }
+      }
+
       // Ghi lịch sử cập nhật trạng thái
       auditLogService.log(
         req.user.sub,
