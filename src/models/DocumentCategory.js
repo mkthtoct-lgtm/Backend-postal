@@ -16,6 +16,10 @@ const documentCategorySchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    googleDriveFolderId: {
+      type: String,
+      default: null,
+    },
     deletedAt: {
       type: Date,
       default: null,
