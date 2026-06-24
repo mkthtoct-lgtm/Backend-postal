@@ -314,6 +314,88 @@ class DashboardService {
   }
 
   /**
+   * Dashboard cho Cộng tác viên (congtacvien) - Thống kê hoa hồng và tiến độ cấp bậc
+   */
+  async getCollaboratorDashboard(userId) {
+    try {
+      const User = require('../models/User');
+      const user = await User.findById(userId)
+        .populate('roleId', 'name slug')
+        .select('-passwordHash -deletedAt')
+        .lean();
+
+      if (!user) {
+        throw new Error('Cộng tác viên không tồn tại.');
+      }
+
+      const commissionService = require('./commission.service');
+      const currentDate = new Date();
+      const stats = await commissionService.getCollaboratorStats(
+        userId,
+        currentDate.getMonth() + 1,
+        currentDate.getFullYear()
+      );
+
+      // Lấy danh sách hoa hồng gần đây (5 giao dịch gần nhất)
+      const recentCommissions = await commissionService.getCommissions({
+        collaboratorId: userId,
+        limit: 5
+      });
+
+      // Tổng hợp doanh số hoa hồng của CTV
+      const Commission = require('../models/Commission');
+      const commissionSummary = await Commission.aggregate([
+        { $match: { collaboratorId: new mongoose.Types.ObjectId(userId) } },
+        {
+          $group: {
+            _id: '$status',
+            total: { $sum: '$commissionAmount' }
+          }
+        }
+      ]);
+
+      const summaries = {
+        pending: 0,
+        approved: 0,
+        paid: 0,
+        cancelled: 0,
+        total: 0
+      };
+
+      commissionSummary.forEach(item => {
+        if (summaries.hasOwnProperty(item._id)) {
+          summaries[item._id] = item.total;
+        }
+        if (item._id !== 'cancelled') {
+          summaries.total += item.total;
+        }
+      });
+
+      return {
+        role: 'congtacvien',
+        roleName: 'Cộng tác viên',
+        user: {
+          id: user._id.toString(),
+          fullName: user.fullName,
+          email: user.email,
+          phone: user.phone,
+          avatarUrl: user.avatarUrl,
+          rank: user.rank || 'Bronze',
+          status: user.status,
+          createdAt: user.createdAt,
+          lastLoginAt: user.lastLoginAt
+        },
+        monthlyStats: stats,
+        commissionSummaries: summaries,
+        recentCommissions: recentCommissions.items
+      };
+    } catch (error) {
+      console.error('Error in getCollaboratorDashboard:', error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Lấy dashboard theo role của người dùng
    */
   async getDashboardByRole(user, options = {}) {
@@ -355,6 +437,11 @@ class DashboardService {
           return await this.getEmployeeDashboard(userId);
         }
 
+        if (['collaborator', 'congtacvien'].includes(requestedType)) {
+          let userId = options.userId || user.sub;
+          return await this.getCollaboratorDashboard(userId);
+        }
+
         throw new Error('Loại dashboard không hợp lệ. Hãy chọn board-of-directors, department-head hoặc employee.');
       }
 
@@ -369,6 +456,11 @@ class DashboardService {
           throw new Error('Trưởng bộ phận phải được gán vào một phòng ban.');
         }
         return await this.getDepartmentHeadDashboard(user.departmentId);
+      }
+
+      // Cộng tác viên (congtacvien) → Dashboard cộng tác viên
+      if (role.slug === 'congtacvien') {
+        return await this.getCollaboratorDashboard(user.sub);
       }
 
       // Nhân sự và các role khác → Dashboard cá nhân

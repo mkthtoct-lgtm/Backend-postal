@@ -84,6 +84,11 @@ const userSchema = new mongoose.Schema(
       enum: ['active', 'inactive', 'suspended', 'pending'],
       default: 'active',
     },
+    rank: {
+      type: String,
+      enum: ['Bronze', 'Silver', 'Gold', 'Daimion', 'Master'],
+      default: 'Bronze',
+    },
     lastLoginAt: {
       type: Date,
       default: null,
