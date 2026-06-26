@@ -333,6 +333,9 @@ model Product {
   categoryId            String?              @db.ObjectId
   category              ProductCategory?     @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   name                  String
+  shortCode             String?
+  visaCode              String?
+  purpose               String?
   country               String
   thumbnailUrl          String?
   serviceFee            Float                @default(0)

@@ -257,7 +257,7 @@ class ProductCategoryController {
   }
 
   /**
-   * Xóa cứng danh mục sản phẩm khỏi database
+   * Xóa mềm danh mục sản phẩm khỏi database (và ẩn toàn bộ sản phẩm thuộc danh mục đó)
    */
   async deleteCategory(req, res) {
     try {
@@ -270,20 +270,35 @@ class ProductCategoryController {
         });
       }
 
-      const category = await productCategoryService.findById(id);
+      const ProductCategory = require('../models/ProductCategory');
+      const category = await ProductCategory.findOne({
+        _id: id,
+        $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      });
+
       if (!category) {
         return res.status(404).json({
           success: false,
-          message: 'Danh mục sản phẩm không tồn tại.',
+          message: 'Danh mục sản phẩm không tồn tại hoặc đã bị xóa.',
         });
       }
 
-      // Xóa cứng khỏi database
-      await productCategoryService.hardDelete(id);
+      // Thực hiện xóa mềm danh mục
+      await productCategoryService.softDelete(id);
+
+      // Tự động ẩn và xóa mềm toàn bộ sản phẩm thuộc danh mục này
+      const Product = require('../models/Product');
+      const updateResult = await Product.updateMany(
+        { categoryId: id, $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }] },
+        { $set: { isActive: false, deletedAt: new Date() } }
+      );
 
       return res.status(200).json({
         success: true,
-        message: 'Xóa danh mục sản phẩm thành công.',
+        message: 'Xóa danh mục sản phẩm và ẩn toàn bộ sản phẩm liên quan thành công.',
+        data: {
+          affectedProductsCount: updateResult.modifiedCount || updateResult.nModified || 0
+        }
       });
     } catch (error) {
       console.error('Error in deleteCategory:', error);
