@@ -2,25 +2,11 @@ const express = require('express');
 const productCategoryController = require('../controllers/productCategory.controller');
 const authMiddleware = require('../middlewares/auth');
 const upload = require('../middlewares/upload');
+const checkPermission = require('../middlewares/checkPermission');
 
 const router = express.Router();
 
-// Middleware kiểm tra quyền quản lý danh mục sản phẩm
-// Cho phép: Admin, Ban giám đốc, Trưởng bộ phận
-const adminOnlyMiddleware = (req, res, next) => {
-  const ALLOWED_ROLE_IDS = [
-    '69fc5af582ef85451120772a', // admin
-    '69fc5af582ef85451120772b', // bangiamdoc
-    '69fc5af582ef85451120772c', // truongbophan
-  ];
-  if (req.user && ALLOWED_ROLE_IDS.includes(req.user.roleId)) {
-    return next();
-  }
-  return res.status(403).json({
-    success: false,
-    message: 'Từ chối truy cập: Bạn không có quyền quản lý danh mục sản phẩm.',
-  });
-};
+
 
 // Multer upload
 const cpUpload = upload.fields([
@@ -100,7 +86,7 @@ router.get(
 router.post(
   '/',
   authMiddleware,
-  adminOnlyMiddleware,
+  checkPermission('products:write'),
   cpUpload,
   productCategoryController.createCategory
 );
@@ -155,7 +141,7 @@ router.post(
 router.patch(
   '/:id',
   authMiddleware,
-  adminOnlyMiddleware,
+  checkPermission('products:write'),
   cpUpload,
   productCategoryController.updateCategory
 );
@@ -182,7 +168,7 @@ router.patch(
 router.delete(
   '/:id',
   authMiddleware,
-  adminOnlyMiddleware,
+  checkPermission('products:write'),
   productCategoryController.deleteCategory
 );
 
