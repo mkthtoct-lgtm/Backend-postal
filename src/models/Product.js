@@ -7,6 +7,24 @@ const productSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    // Mã ngắn sản phẩm (ví dụ: VIS-CA-01)
+    shortCode: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    // Mã visa (ví dụ: CA-TRV-TOUR-SGL)
+    visaCode: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    // Mục đích phân loại visa (ví dụ: Du lịch/Thăm thân)
+    purpose: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     // Danh mục sản phẩm (ObjectId tham chiếu ProductCategory)
     categoryId: {
       type: mongoose.Schema.Types.ObjectId,

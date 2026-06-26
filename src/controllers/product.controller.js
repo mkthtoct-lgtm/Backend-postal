@@ -82,6 +82,17 @@ class ProductController {
         data.image = `/uploads/${req.file.filename}`;
       }
 
+      // Trực quan hóa và chuẩn hóa các giá trị đầu vào mới
+      if (data.shortCode) data.shortCode = data.shortCode.trim();
+      if (data.visaCode) data.visaCode = data.visaCode.trim();
+      if (data.purpose) data.purpose = data.purpose.trim();
+      if (data.name) data.name = data.name.trim();
+
+      // Tự động nối tên sản phẩm và mã visa theo quy chuẩn: Tên - VisaCode
+      if (data.name && data.visaCode) {
+        data.name = `${data.name} - ${data.visaCode}`;
+      }
+
       // Chuyển đổi kiểu dữ liệu cho các field array/object nếu gửi dạng JSON string
       if (typeof data.requirements === 'string') {
         try { data.requirements = JSON.parse(data.requirements); } catch { data.requirements = []; }
@@ -122,6 +133,38 @@ class ProductController {
         data.image = `/uploads/${req.file.filename}`;
       }
 
+      // Lấy thông tin sản phẩm cũ để có name hoặc visaCode nếu một trong hai không được gửi lên
+      const existingProduct = await productService.findById(id);
+      if (!existingProduct) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy sản phẩm để cập nhật.',
+        });
+      }
+
+      // Xác định baseName cũ (loại bỏ phần visaCode nếu có định dạng "Tên - VisaCode")
+      const oldName = existingProduct.name || '';
+      let oldBaseName = oldName;
+      if (existingProduct.visaCode && oldName.includes(existingProduct.visaCode)) {
+        oldBaseName = oldName.split(` - ${existingProduct.visaCode}`)[0] || oldName;
+      } else if (oldName.includes(' - ')) {
+        oldBaseName = oldName.split(' - ')[0] || oldName;
+      }
+
+      const baseName = data.name !== undefined ? data.name.trim() : oldBaseName.trim();
+      const visaCode = data.visaCode !== undefined ? data.visaCode.trim() : (existingProduct.visaCode || '').trim();
+
+      if (data.shortCode !== undefined) data.shortCode = data.shortCode.trim();
+      if (data.visaCode !== undefined) data.visaCode = visaCode;
+      if (data.purpose !== undefined) data.purpose = data.purpose.trim();
+
+      // Cập nhật tên hoàn chỉnh
+      if (baseName && visaCode) {
+        data.name = `${baseName} - ${visaCode}`;
+      } else if (baseName) {
+        data.name = baseName;
+      }
+
       // Chuyển đổi kiểu dữ liệu cho các field array/object nếu gửi dạng JSON string
       if (typeof data.requirements === 'string') {
         try { data.requirements = JSON.parse(data.requirements); } catch { data.requirements = []; }
@@ -134,13 +177,6 @@ class ProductController {
       }
 
       const product = await productService.update(id, data);
-
-      if (!product) {
-        return res.status(404).json({
-          success: false,
-          message: 'Không tìm thấy sản phẩm để cập nhật.',
-        });
-      }
 
       return res.status(200).json({
         success: true,
