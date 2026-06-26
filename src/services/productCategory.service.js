@@ -66,10 +66,14 @@ class ProductCategoryService {
   }
 
   /**
-   * Xóa cứng danh mục sản phẩm khỏi database
+   * Xóa mềm danh mục sản phẩm (đặt deletedAt và status = 'hidden')
    */
-  async hardDelete(id) {
-    return await ProductCategory.findByIdAndDelete(id);
+  async softDelete(id) {
+    return await ProductCategory.findByIdAndUpdate(
+      id,
+      { $set: { deletedAt: new Date(), status: 'hidden' } },
+      { returnDocument: 'after' }
+    );
   }
 }
 

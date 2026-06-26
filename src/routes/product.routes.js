@@ -2,35 +2,26 @@ const express = require('express');
 const productController = require('../controllers/product.controller');
 const authMiddleware = require('../middlewares/auth');
 const upload = require('../middlewares/upload');
+const checkPermission = require('../middlewares/checkPermission');
 
 const router = express.Router();
 
-// Middleware kiểm tra quyền quản lý sản phẩm
-// Cho phép: Admin, Ban giám đốc, Trưởng bộ phận
-const adminOnlyMiddleware = (req, res, next) => {
-  const ALLOWED_ROLE_IDS = [
-    '69fc5af582ef85451120772a', // admin
-    '69fc5af582ef85451120772b', // bangiamdoc
-    '69fc5af582ef85451120772c', // truongbophan
-  ];
-  if (req.user && ALLOWED_ROLE_IDS.includes(req.user.roleId)) {
-    return next();
-  }
-  return res.status(403).json({
-    success: false,
-    message: 'Từ chối truy cập: Bạn không có quyền quản lý sản phẩm.',
-  });
-};
+const Role = require('../models/Role');
 
-// Middleware đánh dấu có phải manager không (không chặn, chỉ ghi nhận)
-const markManagerMiddleware = (req, res, next) => {
-  const ALLOWED_ROLE_IDS = [
-    '69fc5af582ef85451120772a',
-    '69fc5af582ef85451120772b',
-    '69fc5af582ef85451120772c',
-  ];
-  req.isManager = !!(req.user && ALLOWED_ROLE_IDS.includes(req.user.roleId));
-  next();
+// Middleware đánh dấu có phải manager không (kiểm tra động qua quyền products:write hoặc wildcard *)
+const markManagerMiddleware = async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.roleId) {
+      req.isManager = false;
+      return next();
+    }
+    const role = await Role.findById(req.user.roleId);
+    req.isManager = !!(role && (role.permissions.includes('*') || role.permissions.includes('products:write')));
+    next();
+  } catch (error) {
+    req.isManager = false;
+    next();
+  }
 };
 
 /**
@@ -149,7 +140,7 @@ router.get('/:id', authMiddleware, markManagerMiddleware, (req, res, next) => {
  *       403:
  *         description: Không có quyền truy cập (Không phải Admin)
  */
-router.post('/', authMiddleware, adminOnlyMiddleware, upload.single('image'), productController.create);
+router.post('/', authMiddleware, checkPermission('products:write'), upload.single('image'), productController.create);
 
 /**
  * @swagger
@@ -194,7 +185,7 @@ router.post('/', authMiddleware, adminOnlyMiddleware, upload.single('image'), pr
  *       404:
  *         description: Không tìm thấy sản phẩm
  */
-router.patch('/:id', authMiddleware, adminOnlyMiddleware, upload.single('image'), productController.update);
+router.patch('/:id', authMiddleware, checkPermission('products:write'), upload.single('image'), productController.update);
 
 /**
  * @swagger
@@ -221,7 +212,7 @@ router.patch('/:id', authMiddleware, adminOnlyMiddleware, upload.single('image')
  *       404:
  *         description: Không tìm thấy sản phẩm
  */
-router.delete('/:id', authMiddleware, adminOnlyMiddleware, productController.delete);
+router.delete('/:id', authMiddleware, checkPermission('products:write'), productController.delete);
 
 /**
  * @swagger
@@ -236,6 +227,18 @@ router.delete('/:id', authMiddleware, adminOnlyMiddleware, productController.del
  *         name:
  *           type: string
  *           example: Du học nghề Đức
+ *         shortCode:
+ *           type: string
+ *           example: VIS-CA-01
+ *           description: Mã ngắn sản phẩm
+ *         visaCode:
+ *           type: string
+ *           example: CA-TRV-TOUR-SGL
+ *           description: Mã visa
+ *         purpose:
+ *           type: string
+ *           example: Du lịch/Thăm thân
+ *           description: Mục đích phân loại visa
  *         type:
  *           type: string
  *           enum: [duhocduc, dinhcu, visa, daotaongonngu, nophosoonline]
@@ -291,6 +294,18 @@ router.delete('/:id', authMiddleware, adminOnlyMiddleware, productController.del
  *         name:
  *           type: string
  *           example: Du học nghề Đức
+ *         shortCode:
+ *           type: string
+ *           example: VIS-CA-01
+ *           description: Mã ngắn sản phẩm (ví dụ VIS-CA-01)
+ *         visaCode:
+ *           type: string
+ *           example: CA-TRV-TOUR-SGL
+ *           description: Mã visa (ví dụ CA-TRV-TOUR-SGL)
+ *         purpose:
+ *           type: string
+ *           example: Du lịch/Thăm thân
+ *           description: Mục đích phân loại visa (ví dụ Du lịch/Thăm thân)
  *         type:
  *           type: string
  *           enum: [duhocduc, dinhcu, visa, daotaongonngu, nophosoonline]

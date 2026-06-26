@@ -17,15 +17,12 @@ const leadRoutes = require('./routes/lead.routes');
 const chatRoutes = require('./routes/chat.routes');
 const commissionRoutes = require('./routes/commission.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
+const env = require('./configs/env');
 
 const app = express();
 
 app.use(cors({
-  origin: [
-    'https://hubportal-eight.vercel.app', 
-    'http://localhost:5173',               
-    'http://localhost:3000'
-  ],
+  origin: env.CORS_ALLOWED_ORIGINS,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']

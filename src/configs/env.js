@@ -18,6 +18,15 @@ const env = {
     FROM_NAME: process.env.MAIL_FROM_NAME || 'HITO CRM',
   },
   FRONTEND_URL: process.env.FRONTEND_URL || 'https://hubportal-eight.vercel.app',
+  CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS 
+    ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(item => item.trim()) 
+    : ['https://hubportal-eight.vercel.app', 'http://localhost:5173', 'http://localhost:3000'],
+  GOOGLE_DRIVE: {
+    CLIENT_ID: process.env.GOOGLE_DRIVE_CLIENT_ID ? process.env.GOOGLE_DRIVE_CLIENT_ID.trim() : undefined,
+    CLIENT_SECRET: process.env.GOOGLE_DRIVE_CLIENT_SECRET ? process.env.GOOGLE_DRIVE_CLIENT_SECRET.trim() : undefined,
+    REFRESH_TOKEN: process.env.GOOGLE_DRIVE_REFRESH_TOKEN ? process.env.GOOGLE_DRIVE_REFRESH_TOKEN.trim() : undefined,
+    FOLDER_ID: process.env.GOOGLE_DRIVE_FOLDER_ID ? process.env.GOOGLE_DRIVE_FOLDER_ID.trim() : undefined,
+  },
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
 };
 

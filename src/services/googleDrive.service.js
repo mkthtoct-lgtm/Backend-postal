@@ -1,10 +1,11 @@
 const { google } = require('googleapis');
 const { Readable } = require('stream');
+const env = require('../configs/env');
 
-const CLIENT_ID = process.env.GOOGLE_DRIVE_CLIENT_ID ? process.env.GOOGLE_DRIVE_CLIENT_ID.trim() : undefined;
-const CLIENT_SECRET = process.env.GOOGLE_DRIVE_CLIENT_SECRET ? process.env.GOOGLE_DRIVE_CLIENT_SECRET.trim() : undefined;
-const REFRESH_TOKEN = process.env.GOOGLE_DRIVE_REFRESH_TOKEN ? process.env.GOOGLE_DRIVE_REFRESH_TOKEN.trim() : undefined;
-const FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID ? process.env.GOOGLE_DRIVE_FOLDER_ID.trim() : undefined;
+const CLIENT_ID = env.GOOGLE_DRIVE.CLIENT_ID;
+const CLIENT_SECRET = env.GOOGLE_DRIVE.CLIENT_SECRET;
+const REFRESH_TOKEN = env.GOOGLE_DRIVE.REFRESH_TOKEN;
+const FOLDER_ID = env.GOOGLE_DRIVE.FOLDER_ID;
 
 // Khởi tạo đối tượng xác thực OAuth2 Client cho người dùng cá nhân
 let oauth2Client;
