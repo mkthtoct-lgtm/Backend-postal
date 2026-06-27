@@ -16,6 +16,7 @@ const productRoutes = require('./routes/product.routes');
 const leadRoutes = require('./routes/lead.routes');
 const chatRoutes = require('./routes/chat.routes');
 const commissionRoutes = require('./routes/commission.routes');
+const systemSettingRoutes = require('./routes/systemSetting.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 const env = require('./configs/env');
 
@@ -73,6 +74,8 @@ app.use('/api/v1/leads', leadRoutes);
 app.use('/api/v1/commissions', commissionRoutes);
 // Khai báo định tuyến cho hệ thống Chatbot với Google Gemini AI
 app.use('/api/v1/chat', chatRoutes);
+// Khai báo định tuyến cho hệ thống Cấu hình hệ thống (System Settings)
+app.use('/api/v1/system-settings', systemSettingRoutes);
 
 app.get('/', (req, res) => {
   res.json({
