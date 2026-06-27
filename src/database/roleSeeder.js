@@ -27,6 +27,7 @@ const rolesToSeed = [
       'job_descriptions:write',
       'products:read',
       'products:write',
+      'settings:manage',
     ],
     description: 'Ban giám đốc, có quyền quản trị nghiệp vụ, xem nhật ký thao tác và đăng thông báo.',
   },
