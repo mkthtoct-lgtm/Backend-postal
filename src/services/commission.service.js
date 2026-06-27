@@ -3,6 +3,16 @@ const Lead = require('../models/Lead');
 const User = require('../models/User');
 const Product = require('../models/Product');
 const NewsPost = require('../models/NewsPost');
+const systemSettingService = require('./systemSetting.service');
+
+const DEFAULT_COMMISSION_CONFIG = {
+  khachHangThanThiet: 5,
+  daiSuGieoMamDong: 5,
+  daiSuKetNoiBac: 6,
+  daiSuTruCotVang: 7,
+  daiSuTinhAnhKimCuong: 8,
+  daiSuTanTamMaster: 10
+};
 
 // Bảng cấu hình tỷ lệ hoa hồng và các chỉ tiêu của từng cấp bậc
 const COMMISSION_RANKS = {
@@ -78,7 +88,21 @@ class CommissionService {
     }
 
     const rank = collaborator.rank || 'Bronze';
-    const rankConfig = COMMISSION_RANKS[rank] || COMMISSION_RANKS.Bronze;
+    
+    // Đọc cấu hình tỷ lệ hoa hồng động từ DB
+    const commissionConfig = await systemSettingService.getSetting('commission_config', DEFAULT_COMMISSION_CONFIG);
+    const rankMapping = {
+      Bronze: 'daiSuGieoMamDong',
+      Silver: 'daiSuKetNoiBac',
+      Gold: 'daiSuTruCotVang',
+      Daimion: 'daiSuTinhAnhKimCuong',
+      Master: 'daiSuTanTamMaster'
+    };
+    const configKey = rankMapping[rank] || 'daiSuGieoMamDong';
+    const dynamicRatePercentage = commissionConfig[configKey] !== undefined 
+      ? commissionConfig[configKey] 
+      : (DEFAULT_COMMISSION_CONFIG[configKey] || 5);
+    const dynamicRate = dynamicRatePercentage / 100;
 
     // 3. Tìm sản phẩm trong DB để lấy giá bán (serviceFee)
     let productPrice = 0;
@@ -108,7 +132,7 @@ class CommissionService {
     }
 
     // 4. Tính toán số tiền hoa hồng
-    const commissionAmount = productPrice * rankConfig.rate;
+    const commissionAmount = productPrice * dynamicRate;
 
     // 5. Lưu vào bảng Commissions để đối soát
     const commission = new Commission({
@@ -118,13 +142,13 @@ class CommissionService {
       productInterest: productInterestName,
       productPrice,
       collaboratorRank: rank,
-      commissionRate: rankConfig.rate,
+      commissionRate: dynamicRate,
       commissionAmount,
       status: 'pending' // Chờ đối soát và phê duyệt từ Admin
     });
 
     await commission.save();
-    console.log(`[CommissionService] Ghi nhận hoa hồng thành công cho CTV ${collaborator.fullName}: ${commissionAmount} VND (Cấp: ${rank}, Tỷ lệ: ${rankConfig.rate * 100}%)`);
+    console.log(`[CommissionService] Ghi nhận hoa hồng thành công cho CTV ${collaborator.fullName}: ${commissionAmount} VND (Cấp: ${rank}, Tỷ lệ: ${dynamicRate * 100}%)`);
     return commission;
   }
 
@@ -183,8 +207,24 @@ class CommissionService {
     // Lấy cấp bậc hiện tại của CTV
     const currentRank = collaborator.rank || 'Bronze';
 
+    // Đọc cấu hình tỷ lệ hoa hồng động từ DB
+    const commissionConfig = await systemSettingService.getSetting('commission_config', DEFAULT_COMMISSION_CONFIG);
+    const rankMapping = {
+      Bronze: 'daiSuGieoMamDong',
+      Silver: 'daiSuKetNoiBac',
+      Gold: 'daiSuTruCotVang',
+      Daimion: 'daiSuTinhAnhKimCuong',
+      Master: 'daiSuTanTamMaster'
+    };
+
     // Tổng hợp tiến độ so với các mốc cấp bậc
     const ranksProgress = Object.entries(COMMISSION_RANKS).map(([rankKey, rankInfo]) => {
+      const configKey = rankMapping[rankKey] || 'daiSuGieoMamDong';
+      const dynamicRatePercentage = commissionConfig[configKey] !== undefined 
+        ? commissionConfig[configKey] 
+        : (DEFAULT_COMMISSION_CONFIG[configKey] || 5);
+      const dynamicRate = dynamicRatePercentage / 100;
+
       const isReached = 
         postsCount >= rankInfo.targets.posts &&
         referralsCount >= rankInfo.targets.referrals &&
@@ -194,7 +234,7 @@ class CommissionService {
       return {
         rank: rankKey,
         name: rankInfo.name,
-        rate: rankInfo.rate,
+        rate: dynamicRate,
         targets: rankInfo.targets,
         isReached,
         progress: {

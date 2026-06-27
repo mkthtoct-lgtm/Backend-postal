@@ -1,4 +1,5 @@
 const geminiService = require('../services/gemini.service');
+const Role = require('../models/Role');
 
 class ChatController {
   /**
@@ -15,8 +16,25 @@ class ChatController {
         });
       }
 
-      // Gọi service để lấy câu trả lời của AI
-      const reply = await geminiService.generateChatResponse(message);
+      // Lấy thông tin role và quyền hạn của user từ JWT token
+      const userContext = {
+        name: req.user.name || 'Nhân viên',
+        email: req.user.email || '',
+        roleId: req.user.roleId || null,
+        roleName: 'Nhân viên',
+        permissions: []
+      };
+
+      if (userContext.roleId) {
+        const role = await Role.findById(userContext.roleId).lean();
+        if (role) {
+          userContext.roleName = role.name;
+          userContext.permissions = role.permissions || [];
+        }
+      }
+
+      // Gọi service với context phân quyền của user
+      const reply = await geminiService.generateChatResponse(message, userContext);
 
       return res.status(200).json({
         success: true,
