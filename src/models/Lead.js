@@ -66,6 +66,26 @@ const leadSchema = new mongoose.Schema(
       enum: ['dang_tu_van', 'cho_chot_hop_dong', 'xu_ly_ho_so', 'lost'],
       default: 'dang_tu_van',
     },
+    cccdFolderId: {
+      type: String,
+      default: null,
+    },
+    cccdFrontFileId: {
+      type: String,
+      default: null,
+    },
+    cccdFrontUrl: {
+      type: String,
+      default: null,
+    },
+    cccdBackFileId: {
+      type: String,
+      default: null,
+    },
+    cccdBackUrl: {
+      type: String,
+      default: null,
+    },
     deletedAt: {
       type: Date,
       default: null,
