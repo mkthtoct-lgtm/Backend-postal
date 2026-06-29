@@ -50,10 +50,17 @@ class GoogleDriveService {
       const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
       const uniqueName = `${Date.now()}-${safeName}`;
 
-      // Chuyển đổi file buffer thành stream để đẩy lên Google Drive API
-      const bufferStream = new Readable();
-      bufferStream.push(file.buffer);
-      bufferStream.push(null);
+      // Chuyển đổi file buffer thành stream hoặc đọc từ đường dẫn file vật lý
+      let bodyStream;
+      if (file.buffer) {
+        bodyStream = new Readable();
+        bodyStream.push(file.buffer);
+        bodyStream.push(null);
+      } else if (file.path) {
+        bodyStream = require('fs').createReadStream(file.path);
+      } else {
+        throw new Error('Dữ liệu file không hợp lệ (không có buffer hoặc path)');
+      }
 
       // 1. Thực hiện tạo file trên Google Drive
       const targetParent = parentFolderId || FOLDER_ID;
@@ -64,7 +71,7 @@ class GoogleDriveService {
 
       const media = {
         mimeType: file.mimetype,
-        body: bufferStream
+        body: bodyStream
       };
 
       const response = await drive.files.create({
