@@ -103,6 +103,9 @@ class ProductController {
       if (typeof data.steps === 'string') {
         try { data.steps = JSON.parse(data.steps); } catch { data.steps = []; }
       }
+      if (typeof data.requiredDocuments === 'string') {
+        try { data.requiredDocuments = JSON.parse(data.requiredDocuments); } catch { data.requiredDocuments = {}; }
+      }
 
       const product = await productService.create(data);
 
@@ -174,6 +177,9 @@ class ProductController {
       }
       if (typeof data.steps === 'string') {
         try { data.steps = JSON.parse(data.steps); } catch { data.steps = []; }
+      }
+      if (typeof data.requiredDocuments === 'string') {
+        try { data.requiredDocuments = JSON.parse(data.requiredDocuments); } catch { data.requiredDocuments = {}; }
       }
 
       const product = await productService.update(id, data);
