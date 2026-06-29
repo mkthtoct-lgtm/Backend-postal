@@ -94,6 +94,64 @@ const productSchema = new mongoose.Schema(
       default: 'VND',
       trim: true,
     },
+    // Cấu hình các loại hồ sơ cần chuẩn bị và lưu ý đặc thù
+    requiredDocuments: {
+      personal: {
+        type: [
+          {
+            name: { type: String, trim: true },
+            note: { type: String, default: '', trim: true },
+            isRequired: { type: Boolean, default: true },
+          },
+        ],
+        default: [],
+      },
+      work: {
+        type: [
+          {
+            name: { type: String, trim: true },
+            note: { type: String, default: '', trim: true },
+            isRequired: { type: Boolean, default: true },
+          },
+        ],
+        default: [],
+      },
+      financial: {
+        type: [
+          {
+            name: { type: String, trim: true },
+            note: { type: String, default: '', trim: true },
+            isRequired: { type: Boolean, default: true },
+          },
+        ],
+        default: [],
+      },
+      administrative: {
+        type: [
+          {
+            name: { type: String, trim: true },
+            note: { type: String, default: '', trim: true },
+            isRequired: { type: Boolean, default: true },
+          },
+        ],
+        default: [],
+      },
+      trip: {
+        type: [
+          {
+            name: { type: String, trim: true },
+            note: { type: String, default: '', trim: true },
+            isRequired: { type: Boolean, default: true },
+          },
+        ],
+        default: [],
+      },
+      specialNotes: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+    },
     // Ảnh đại diện sản phẩm
     image: {
       type: String,
