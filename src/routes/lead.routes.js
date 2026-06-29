@@ -2,6 +2,14 @@ const express = require('express');
 const leadController = require('../controllers/lead.controller');
 const authMiddleware = require('../middlewares/auth');
 const checkPermission = require('../middlewares/checkPermission');
+const multer = require('multer');
+
+// Cấu hình lưu trữ bộ nhớ RAM tạm thời phục vụ tải lên Google Drive
+const storage = multer.memoryStorage();
+const uploadMem = multer({
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 } // Tối đa 50MB
+});
 
 const router = express.Router();
 
@@ -23,12 +31,14 @@ const router = express.Router();
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             required:
  *               - customerName
  *               - phone
+ *               - cccdFront
+ *               - cccdBack
  *             properties:
  *               customerName:
  *                 type: string
@@ -70,9 +80,17 @@ const router = express.Router();
  *                 type: string
  *                 example: Cần tư vấn lộ trình học chứng chỉ B1.
  *                 description: Ghi chú thêm
+ *               cccdFront:
+ *                 type: string
+ *                 format: binary
+ *                 description: Tệp tin ảnh CCCD mặt trước (Bắt buộc)
+ *               cccdBack:
+ *                 type: string
+ *                 format: binary
+ *                 description: Tệp tin ảnh CCCD mặt sau (Bắt buộc)
  *     responses:
  *       201:
- *         description: Gửi lead thành công, tự động lưu DB và đẩy sang BizFly CRM Webhook
+ *         description: Gửi lead thành công, tự động lưu DB, tải file CCCD lên Google Drive và đẩy sang BizFly CRM Webhook
  *         content:
  *           application/json:
  *             schema:
@@ -87,10 +105,22 @@ const router = express.Router();
  *                   $ref: '#/components/schemas/Lead'
  *       400:
  *         description: Thiếu thông tin bắt buộc hoặc dữ liệu sai định dạng
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
  *       401:
  *         description: Chưa đăng nhập
+ * /:
+ *   post:
  */
-router.post('/', leadController.createLead);
+router.post('/', uploadMem.fields([{ name: 'cccdFront', maxCount: 1 }, { name: 'cccdBack', maxCount: 1 }]), leadController.createLead);
 
 /**
  * @swagger
@@ -265,6 +295,18 @@ router.patch('/:id/status', authMiddleware, checkPermission('users:write'), lead
  *           type: string
  *           nullable: true
  *           example: "20199488192"
+ *         cccdFolderId:
+ *           type: string
+ *           description: ID thư mục Google Drive chứa CCCD
+ *           example: "1a2b3c4d5e6f7g8h9i"
+ *         cccdFileId:
+ *           type: string
+ *           description: ID file ảnh CCCD trên Google Drive
+ *           example: "9h8g7f6e5d4c3b2a1"
+ *         cccdUrl:
+ *           type: string
+ *           description: Đường dẫn xem trực tiếp ảnh CCCD trên Google Drive
+ *           example: "https://drive.google.com/file/d/1a2b3c4d5e6f7g8h9i/view?usp=drivesdk"
  *         status:
  *           type: string
  *           enum: [dang_tu_van, cho_chot_hop_dong, xu_ly_ho_so, lost]

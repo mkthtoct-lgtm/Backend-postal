@@ -1,6 +1,7 @@
 const leadService = require('../services/lead.service');
 const crmService = require('../services/crm.service');
 const auditLogService = require('../services/auditLog.service');
+const googleDriveService = require('../services/googleDrive.service');
 const mongoose = require('mongoose');
 
 class LeadController {
@@ -31,6 +32,16 @@ class LeadController {
         return res.status(400).json({
           success: false,
           message: 'Vui lòng cung cấp đầy đủ thông tin: Họ tên và Số điện thoại khách hàng.'
+        });
+      }
+
+      // Ảnh CCCD mặt trước và mặt sau là bắt buộc phải có
+      const frontFile = req.files?.cccdFront?.[0];
+      const backFile = req.files?.cccdBack?.[0];
+      if (!frontFile || !backFile) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng tải lên cả hai mặt trước và sau của CCCD khách hàng (bắt buộc).'
         });
       }
 
@@ -67,6 +78,43 @@ class LeadController {
         }
       }
 
+      // Tạo thư mục và tải file ảnh CCCD lên Google Drive
+      let cccdFolderId = null;
+      let cccdFrontFileId = null;
+      let cccdFrontUrl = null;
+      let cccdBackFileId = null;
+      let cccdBackUrl = null;
+      let finalNote = note ? note.trim() : '';
+
+      try {
+        const folderName = `${customerName.trim()} - ${phone.trim()}`;
+        // Tạo thư mục mang tên khách hàng trên Google Drive
+        cccdFolderId = await googleDriveService.createFolder(folderName);
+        
+        // Tải file ảnh CCCD mặt trước vào thư mục vừa tạo
+        const frontUpload = {
+          ...frontFile,
+          originalname: `Mat_truoc_${frontFile.originalname}`
+        };
+        const uploadFrontResult = await googleDriveService.uploadFile(frontUpload, cccdFolderId);
+        cccdFrontFileId = uploadFrontResult.fileId;
+        cccdFrontUrl = uploadFrontResult.webViewLink;
+
+        // Tải file ảnh CCCD mặt sau vào thư mục vừa tạo
+        const backUpload = {
+          ...backFile,
+          originalname: `Mat_sau_${backFile.originalname}`
+        };
+        const uploadBackResult = await googleDriveService.uploadFile(backUpload, cccdFolderId);
+        cccdBackFileId = uploadBackResult.fileId;
+        cccdBackUrl = uploadBackResult.webViewLink;
+      } catch (driveErr) {
+        console.warn('[LeadController] Lỗi xử lý Google Drive cho CCCD (được bỏ qua để không chặn tiến trình):', driveErr.message);
+        // Lưu lại cảnh báo lỗi vào phần ghi chú của lead
+        const driveWarning = `[Cảnh báo: Tải CCCD lên Drive thất bại: ${driveErr.message}]`;
+        finalNote = finalNote ? `${finalNote}\n${driveWarning}` : driveWarning;
+      }
+
       // 1. Lưu trữ thông tin lead cục bộ dưới trạng thái mặc định "dang_tu_van" hoặc trạng thái gửi từ body
       const leadData = {
         collaboratorId,
@@ -79,8 +127,13 @@ class LeadController {
         budgetRange: budgetRange ? budgetRange.trim() : '',
         urgency: urgency || 'Trong 1-3 tháng',
         preferredContact: preferredContact || 'Zalo/Điện thoại',
-        note: note ? note.trim() : '',
-        status: status || 'dang_tu_van'
+        note: finalNote,
+        status: status || 'dang_tu_van',
+        cccdFolderId,
+        cccdFrontFileId,
+        cccdFrontUrl,
+        cccdBackFileId,
+        cccdBackUrl
       };
 
       const lead = await leadService.create(leadData);
