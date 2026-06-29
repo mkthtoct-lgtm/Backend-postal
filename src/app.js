@@ -23,7 +23,22 @@ const env = require('./configs/env');
 const app = express();
 
 app.use(cors({
-  origin: env.CORS_ALLOWED_ORIGINS,
+  origin: function (origin, callback) {
+    // Cho phép các request không có origin (như Postman, Mobile apps)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = env.CORS_ALLOWED_ORIGINS || [];
+    const isAllowed = allowedOrigins.includes(origin) ||
+                      origin.startsWith('http://localhost') ||
+                      origin.endsWith('.vercel.app') ||
+                      origin.includes('hto.edu.vn');
+                      
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
