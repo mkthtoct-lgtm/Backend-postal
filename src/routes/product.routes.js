@@ -275,6 +275,8 @@ router.delete('/:id', authMiddleware, checkPermission('products:write'), product
  *           items:
  *             type: string
  *           example: ["Tư vấn ngành", "Ký hợp đồng", "Nộp hồ sơ"]
+ *         requiredDocuments:
+ *           $ref: '#/components/schemas/RequiredDocuments'
  *         deletedAt:
  *           type: string
  *           format: date-time
@@ -341,6 +343,46 @@ router.delete('/:id', authMiddleware, checkPermission('products:write'), product
  *           items:
  *             type: string
  *           example: ["Tư vấn ngành", "Ký hợp đồng", "Nộp hồ sơ"]
+ *         requiredDocuments:
+ *           $ref: '#/components/schemas/RequiredDocuments'
+ *     RequiredDocuments:
+ *       type: object
+ *       properties:
+ *         personal:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/DocumentItem'
+ *         work:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/DocumentItem'
+ *         financial:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/DocumentItem'
+ *         administrative:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/DocumentItem'
+ *         trip:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/DocumentItem'
+ *         specialNotes:
+ *           type: string
+ *           example: "Lưu ý đặc thù của quốc gia này..."
+ *     DocumentItem:
+ *       type: object
+ *       properties:
+ *         name:
+ *           type: string
+ *           example: "Hộ chiếu bản gốc"
+ *         note:
+ *           type: string
+ *           example: "Còn hạn trên 6 tháng"
+ *         isRequired:
+ *           type: boolean
+ *           example: true
  */
 
 module.exports = router;
