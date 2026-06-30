@@ -4,7 +4,7 @@ class SopService {
   /**
    * Lấy danh sách SOP có bộ lọc
    */
-  async findAll({ search = '', category = '', department = '', status = '' } = {}) {
+  async findAll({ search = '', category = '', department = '', status = '', roleName = '' } = {}) {
     const filter = { deletedAt: null };
 
     if (category && category !== 'all') {
@@ -27,6 +27,21 @@ class SopService {
         { summary: searchRegex },
         { tags: { $in: [new RegExp(search, 'i')] } },
       ];
+    }
+
+    // Phân quyền theo vai trò (allowedRoles)
+    // Nếu không phải admin hoặc ban giám đốc thì chỉ lấy các SOP mà allowedRoles chứa roleName hoặc 'all'
+    if (roleName && roleName !== 'admin' && roleName !== 'board_of_directors') {
+      const roleFilter = { allowedRoles: { $in: ['all', roleName] } };
+      if (filter.$or) {
+        filter.$and = [
+          { $or: filter.$or },
+          roleFilter
+        ];
+        delete filter.$or;
+      } else {
+        filter.allowedRoles = { $in: ['all', roleName] };
+      }
     }
 
     return await Sop.find(filter).sort({ code: 1, createdAt: -1 });

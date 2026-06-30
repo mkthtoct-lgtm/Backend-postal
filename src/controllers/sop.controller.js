@@ -7,7 +7,13 @@ class SopController {
   async getSops(req, res) {
     try {
       const { search, category, department, status } = req.query;
-      const sops = await sopService.findAll({ search, category, department, status });
+
+      // Lấy roleName của user đăng nhập
+      const Role = require('../models/Role');
+      const userRole = await Role.findById(req.user.roleId).lean();
+      const roleName = userRole?.slug || 'user';
+
+      const sops = await sopService.findAll({ search, category, department, status, roleName });
 
       return res.status(200).json({
         success: true,
@@ -36,6 +42,24 @@ class SopController {
         return res.status(404).json({
           success: false,
           message: 'Không tìm thấy SOP yêu cầu.',
+        });
+      }
+
+      // Lấy roleName của user đăng nhập để kiểm tra quyền truy cập chi tiết
+      const Role = require('../models/Role');
+      const userRole = await Role.findById(req.user.roleId).lean();
+      const roleName = userRole?.slug || 'user';
+
+      if (
+        roleName !== 'admin' &&
+        roleName !== 'board_of_directors' &&
+        sop.allowedRoles &&
+        !sop.allowedRoles.includes('all') &&
+        !sop.allowedRoles.includes(roleName)
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: 'Bạn không có quyền truy cập tài liệu SOP này.',
         });
       }
 
