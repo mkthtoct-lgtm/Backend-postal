@@ -299,6 +299,13 @@ class LeadController {
         }
       }
 
+      // ĐỒNG BỘ CRM: Đẩy thông tin trạng thái mới và đơn hàng/hoa hồng lên BizFly CRM
+      try {
+        await crmService.forwardToBizFly(updatedLead);
+      } catch (crmErr) {
+        console.error('[LeadController] Lỗi khi đồng bộ cập nhật đơn hàng lên BizFly CRM:', crmErr.message);
+      }
+
       // Ghi lịch sử cập nhật trạng thái
       auditLogService.log(
         req.user.sub,
@@ -317,6 +324,141 @@ class LeadController {
       return res.status(500).json({
         success: false,
         message: 'Lỗi máy chủ khi cập nhật trạng thái lead.',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Webhook tiếp nhận tín hiệu cập nhật từ Bizfly CRM gửi về (Đồng bộ 2 chiều)
+   */
+  async handleCrmWebhook(req, res) {
+    try {
+      console.log('[Bizfly Webhook] Nhận payload từ CRM:', req.body);
+      const payload = req.body || {};
+
+      // 1. Trích xuất thông tin định danh (Số điện thoại hoặc Email)
+      let phone = payload.phone || payload.customer_phone || payload.phone_number || payload.customerPhone;
+      let email = payload.email || payload.customer_email || payload.customerEmail;
+      
+      // Nếu có đối tượng contact lồng nhau
+      if (payload.contact) {
+        phone = phone || payload.contact.phone || payload.contact.customer_phone;
+        email = email || payload.contact.email;
+      }
+
+      if (!phone && !email) {
+        return res.status(200).json({
+          success: false,
+          message: 'Không tìm thấy số điện thoại hoặc email trong payload để định danh khách hàng.'
+        });
+      }
+
+      // Chuẩn hóa số điện thoại (bỏ khoảng trắng, ký tự đặc biệt)
+      let cleanPhone = '';
+      if (phone) {
+        cleanPhone = String(phone).trim().replace(/[^0-9+]/g, '');
+        // Hỗ trợ chuyển đầu +84 thành đầu 0 để khớp DB
+        if (cleanPhone.startsWith('+84')) {
+          cleanPhone = '0' + cleanPhone.slice(3);
+        } else if (cleanPhone.startsWith('84') && cleanPhone.length > 9) {
+          cleanPhone = '0' + cleanPhone.slice(2);
+        }
+      }
+
+      // 2. Trích xuất trạng thái mới từ CRM
+      // Bizfly thường truyền trạng thái qua các trường: status, process, status_key, statusKey, v.v.
+      const rawStatus = payload.status || payload.process || payload.status_key || payload.statusKey || payload.tien_trinh;
+      if (!rawStatus) {
+        return res.status(200).json({
+          success: false,
+          message: 'Không tìm thấy trường trạng thái (status/process/tiến trình) trong payload.'
+        });
+      }
+
+      // 3. Phân loại và chuyển đổi trạng thái Bizfly sang trạng thái hệ thống
+      const normalizeStatus = (txt) => {
+        const s = String(txt).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (s.includes('ky hop dong') || s.includes('thanh cong') || s.includes('ho so') || s.includes('xu_ly_ho_so') || s.includes('hop dong')) {
+          return 'xu_ly_ho_so';
+        }
+        if (s.includes('cho chot') || s.includes('cho_chot_hop_dong')) {
+          return 'cho_chot_hop_dong';
+        }
+        if (s.includes('that bai') || s.includes('lost') || s.includes('huy')) {
+          return 'lost';
+        }
+        if (s.includes('tu van') || s.includes('dang_tu_van') || s.includes('moi')) {
+          return 'dang_tu_van';
+        }
+        return null;
+      };
+
+      const newStatus = normalizeStatus(rawStatus);
+      if (!newStatus) {
+        return res.status(200).json({
+          success: false,
+          message: `Trạng thái nhận được từ CRM "${rawStatus}" chưa được cấu hình map sang hệ thống.`
+        });
+      }
+
+      // 4. Tìm kiếm khách hàng (Lead) trong DB
+      const Lead = require('../models/Lead');
+      let lead = null;
+      if (cleanPhone) {
+        lead = await Lead.findOne({ phone: cleanPhone, deletedAt: null });
+      }
+      if (!lead && email) {
+        lead = await Lead.findOne({ email: String(email).trim().toLowerCase(), deletedAt: null });
+      }
+
+      if (!lead) {
+        return res.status(200).json({
+          success: false,
+          message: 'Không tìm thấy khách hàng tương ứng trong cơ sở dữ liệu Website.'
+        });
+      }
+
+      // 5. Cập nhật trạng thái nếu có thay đổi
+      const oldStatus = lead.status;
+      if (oldStatus !== newStatus) {
+        await leadService.updateStatus(lead._id, newStatus);
+
+        // Nếu chuyển sang 'xu_ly_ho_so', tự động tính hoa hồng
+        if (newStatus === 'xu_ly_ho_so' && oldStatus !== 'xu_ly_ho_so') {
+          try {
+            const commissionService = require('../services/commission.service');
+            await commissionService.calculateCommission(lead._id);
+          } catch (commErr) {
+            console.error('[Bizfly Webhook] Lỗi khi tự động tính hoa hồng đơn hàng:', commErr.message);
+          }
+        }
+
+        // Ghi lịch sử cập nhật trạng thái (Actor là System/Bizfly CRM)
+        const SYSTEM_ACTOR_ID = '69fc5af582ef85451120772a'; // Mặc định ID admin
+        auditLogService.log(
+          SYSTEM_ACTOR_ID,
+          'lead.update',
+          { type: 'lead', id: lead._id.toString(), name: lead.customerName },
+          { oldStatus, newStatus: newStatus }
+        );
+
+        return res.status(200).json({
+          success: true,
+          message: `Đồng bộ trạng thái từ CRM thành công: "${oldStatus}" -> "${newStatus}"`
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Trạng thái trên Website đã đồng bộ khớp với CRM, không cần cập nhật.'
+      });
+
+    } catch (error) {
+      console.error('[Bizfly Webhook] Lỗi xử lý webhook:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi xử lý webhook đồng bộ CRM.',
         error: error.message
       });
     }

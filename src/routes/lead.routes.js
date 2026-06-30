@@ -249,6 +249,31 @@ router.patch('/:id/status', authMiddleware, checkPermission('users:write'), lead
 
 /**
  * @swagger
+ * /leads/webhook-crm:
+ *   post:
+ *     summary: Webhook tiếp nhận tín hiệu cập nhật từ Bizfly CRM gửi về (Đồng bộ 2 chiều)
+ *     tags: [Leads Management]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               phone:
+ *                 type: string
+ *                 example: "0939367110"
+ *               status:
+ *                 type: string
+ *                 example: "Ký hợp đồng"
+ *     responses:
+ *       200:
+ *         description: Xử lý thành công
+ */
+router.post('/webhook-crm', leadController.handleCrmWebhook);
+
+/**
+ * @swagger
  * components:
  *   schemas:
  *     Lead:
