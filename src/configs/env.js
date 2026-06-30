@@ -28,6 +28,7 @@ const env = {
     FOLDER_ID: process.env.GOOGLE_DRIVE_FOLDER_ID ? process.env.GOOGLE_DRIVE_FOLDER_ID.trim() : undefined,
   },
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  BIZFLY_WEBHOOK_URL: process.env.BIZFLY_WEBHOOK_URL || '',
 };
 
 module.exports = env;
