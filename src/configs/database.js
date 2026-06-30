@@ -13,6 +13,18 @@ const connectDatabase = async () => {
     // Tự động nạp dữ liệu tin tức & sự kiện mẫu vào bảng news_posts
     const seedNewsPosts = require('../database/newsPostSeeder');
     await seedNewsPosts();
+
+    // Tự động nạp các quy trình chuẩn SOP
+    const seedSops = require('../database/sopSeeder');
+    await seedSops();
+
+    // Tự động nạp các checklist công việc
+    const seedChecklists = require('../database/checklistSeeder');
+    await seedChecklists();
+
+    // Tự động nạp các câu hỏi AI pending
+    const seedAiQuestions = require('../database/aiQuestionSeeder');
+    await seedAiQuestions();
   } catch (error) {
     console.error('MongoDB connection failed:', error.message);
     process.exit(1);
