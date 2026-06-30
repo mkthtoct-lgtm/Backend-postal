@@ -17,6 +17,9 @@ const leadRoutes = require('./routes/lead.routes');
 const chatRoutes = require('./routes/chat.routes');
 const commissionRoutes = require('./routes/commission.routes');
 const systemSettingRoutes = require('./routes/systemSetting.routes');
+const sopRoutes = require('./routes/sop.routes');
+const checklistRoutes = require('./routes/checklist.routes');
+const aiConfigRoutes = require('./routes/aiConfig.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 const env = require('./configs/env');
 
@@ -91,6 +94,10 @@ app.use('/api/v1/commissions', commissionRoutes);
 app.use('/api/v1/chat', chatRoutes);
 // Khai báo định tuyến cho hệ thống Cấu hình hệ thống (System Settings)
 app.use('/api/v1/system-settings', systemSettingRoutes);
+// Khai báo định tuyến cho SOP, Checklist và AI
+app.use('/api/v1/sops', sopRoutes);
+app.use('/api/v1/checklists', checklistRoutes);
+app.use('/api/v1/ai', aiConfigRoutes);
 
 app.get('/', (req, res) => {
   res.json({

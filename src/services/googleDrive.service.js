@@ -1,11 +1,26 @@
 const { google } = require('googleapis');
 const { Readable } = require('stream');
+const fs = require('fs');
 const env = require('../configs/env');
 
 const CLIENT_ID = env.GOOGLE_DRIVE.CLIENT_ID;
 const CLIENT_SECRET = env.GOOGLE_DRIVE.CLIENT_SECRET;
 const REFRESH_TOKEN = env.GOOGLE_DRIVE.REFRESH_TOKEN;
 const FOLDER_ID = env.GOOGLE_DRIVE.FOLDER_ID;
+
+// Cảnh báo sớm nếu thiếu cấu hình
+if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN || !FOLDER_ID) {
+  console.warn('⚠️ [GoogleDriveService]: Thiếu thông tin cấu hình Google Drive trong file .env! Các chức năng tải lên tài liệu và CCCD sẽ thất bại.');
+}
+
+// Hàm chuẩn hóa loại bỏ dấu tiếng Việt để giữ tên file sạch và dễ đọc
+function removeVietnameseTones(str) {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D');
+}
 
 // Khởi tạo đối tượng xác thực OAuth2 Client cho người dùng cá nhân
 let oauth2Client;
@@ -16,7 +31,7 @@ try {
     oauth2Client = new google.auth.OAuth2(
       CLIENT_ID,
       CLIENT_SECRET,
-      'https://developers.google.com/oauthplayground' // Redirect URI tương thích dùng lúc Playground
+      'https://developers.google.com/oauthplayground'
     );
     
     oauth2Client.setCredentials({
@@ -39,21 +54,32 @@ class GoogleDriveService {
   async uploadFile(file, parentFolderId = null) {
     try {
       if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN || !FOLDER_ID) {
-        throw new Error('Thiếu thông tin cấu hình Google Drive OAuth2 trong file .env (GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET, GOOGLE_DRIVE_REFRESH_TOKEN, GOOGLE_DRIVE_FOLDER_ID)');
+        throw new Error('Thiếu thông tin cấu hình Google Drive OAuth2 trong file .env');
       }
 
       if (!drive) {
         throw new Error('Google Drive API client chưa được khởi tạo thành công.');
       }
 
-      // Tạo tên file độc nhất bằng cách ghép dấu thời gian
-      const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      // Loại bỏ dấu tiếng Việt trước rồi mới làm sạch tên file
+      const normalizedName = removeVietnameseTones(file.originalname);
+      const safeName = normalizedName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
       const uniqueName = `${Date.now()}-${safeName}`;
 
-      // Chuyển đổi file buffer thành stream để đẩy lên Google Drive API
-      const bufferStream = new Readable();
-      bufferStream.push(file.buffer);
-      bufferStream.push(null);
+      let bodyStream;
+      if (file.buffer) {
+        bodyStream = new Readable();
+        bodyStream.push(file.buffer);
+        bodyStream.push(null);
+      } else if (file.path) {
+        // Kiểm tra xem file vật lý có thực sự tồn tại không
+        if (!fs.existsSync(file.path)) {
+          throw new Error(`Không tìm thấy tệp vật lý tại đường dẫn: ${file.path}`);
+        }
+        bodyStream = fs.createReadStream(file.path);
+      } else {
+        throw new Error('Dữ liệu file không hợp lệ (không có buffer hoặc path)');
+      }
 
       // 1. Thực hiện tạo file trên Google Drive
       const targetParent = parentFolderId || FOLDER_ID;
@@ -64,7 +90,7 @@ class GoogleDriveService {
 
       const media = {
         mimeType: file.mimetype,
-        body: bufferStream
+        body: bodyStream
       };
 
       const response = await drive.files.create({
@@ -76,7 +102,6 @@ class GoogleDriveService {
       const fileId = response.data.id;
 
       // 2. Thiết lập quyền "Đọc công khai cho bất cứ ai có link"
-      // Điều này giúp tất cả nhân viên trong công ty click vào link đều xem/tải được ngay lập tức
       await drive.permissions.create({
         fileId: fileId,
         requestBody: {
@@ -97,9 +122,6 @@ class GoogleDriveService {
 
   /**
    * Tạo thư mục mới trên Google Drive dưới thư mục gốc chỉ định
-   * @param {string} folderName - Tên thư mục cần tạo
-   * @param {string} [parentFolderId] - ID thư mục cha (mặc định là FOLDER_ID)
-   * @returns {Promise<string>} Trả về ID thư mục vừa tạo
    */
   async createFolder(folderName, parentFolderId = null) {
     try {
@@ -143,9 +165,6 @@ class GoogleDriveService {
 
   /**
    * Đổi tên thư mục trên Google Drive
-   * @param {string} folderId - ID thư mục cần đổi tên
-   * @param {string} newFolderName - Tên mới của thư mục
-   * @returns {Promise<void>}
    */
   async renameFolder(folderId, newFolderName) {
     try {
@@ -161,7 +180,6 @@ class GoogleDriveService {
       });
     } catch (error) {
       console.error(`Lỗi hệ thống khi đổi tên thư mục (${folderId}) trên Google Drive:`, error);
-      // Không ném lỗi ra ngoài làm crash luồng chính của database khi cập nhật tên
     }
   }
 }
