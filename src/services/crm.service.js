@@ -1,5 +1,6 @@
 const env = require('../configs/env');
 // test 123
+
 class CrmService {
   /**
    * Đồng bộ thông tin Lead sang BizFly CRM qua Public Webhook
@@ -67,6 +68,9 @@ class CrmService {
         // Định dạng snake_case
         status: statusText,
         status_key: lead.status,
+        description: `Dịch vụ quan tâm: ${lead.productInterest}. Quốc gia: ${lead.countryInterest}. Ngân sách: ${lead.budgetRange}. Mức độ cấp thiết: ${lead.urgency}. Kênh liên hệ: ${lead.preferredContact}. Ghi chú CTV: ${lead.note}. Người giới thiệu: ${collaboratorInfo}`,
+
+        // Định dạng snake_case
         product_interest: lead.productInterest,
         country_interest: lead.countryInterest,
         budget_range: lead.budgetRange,
@@ -87,6 +91,7 @@ class CrmService {
         statusKey: lead.status,
         productPrice: commissionDetails ? commissionDetails.productPrice : 0,
         commissionAmount: commissionDetails ? commissionDetails.commissionAmount : 0
+        collaboratorName: collaboratorName
       };
 
       console.log(`[Bizfly CRM] Bắt đầu đẩy lead lên BizFly...`, payload);
