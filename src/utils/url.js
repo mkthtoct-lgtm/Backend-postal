@@ -14,6 +14,11 @@ const normalizeUploadUrl = (url, req) => {
     return url;
   }
 
+  // Chuẩn hóa link Google Drive từ dạng /view sang dạng /preview để tránh lỗi chặn iframe (CSP frame-ancestors)
+  if (url.includes('drive.google.com/file/d/')) {
+    return url.replace(/\/view(\?.*)?$/, '/preview');
+  }
+
   // Nếu url chứa đường dẫn uploads
   if (url.includes('/uploads/')) {
     // Cắt lấy phần path bắt đầu từ /uploads/
