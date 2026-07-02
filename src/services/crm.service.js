@@ -13,11 +13,15 @@ class CrmService {
       // Trích xuất thông tin Cộng tác viên / Người giới thiệu từ database
       let collaborator = null;
       if (lead.collaboratorId) {
-        try {
-          const User = require('../models/User');
-          collaborator = await User.findById(lead.collaboratorId).lean();
-        } catch (dbErr) {
-          console.error('[CrmService] Lỗi khi truy vấn thông tin CTV từ db:', dbErr.message);
+        if (typeof lead.collaboratorId === 'object' && lead.collaboratorId.fullName) {
+          collaborator = lead.collaboratorId;
+        } else {
+          try {
+            const User = require('../models/User');
+            collaborator = await User.findById(lead.collaboratorId).lean();
+          } catch (dbErr) {
+            console.error('[CrmService] Lỗi khi truy vấn thông tin CTV từ db:', dbErr.message);
+          }
         }
       }
 
