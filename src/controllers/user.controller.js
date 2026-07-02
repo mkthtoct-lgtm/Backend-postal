@@ -64,7 +64,7 @@ const toCleanUserResponse = (user) => {
 };
 
 // Hàm helper giải mã và lưu ảnh base64 vật lý lên server
-const saveBase64Image = (base64Str, protocol, host) => {
+const saveBase64Image = (base64Str) => {
   try {
     const fs = require('fs');
     const path = require('path');
@@ -91,7 +91,7 @@ const saveBase64Image = (base64Str, protocol, host) => {
     const filePath = path.join(uploadDir, filename);
     fs.writeFileSync(filePath, buffer);
 
-    return `${protocol}://${host}/uploads/${filename}`;
+    return `/uploads/${filename}`;
   } catch (error) {
     console.error('[Base64 Upload Error] Lỗi khi lưu ảnh:', error);
     return null;
@@ -339,17 +339,14 @@ class UserController {
 
       // Xử lý các tệp tải lên nếu có (avatar, banner)
       if (req.files) {
-        const protocol = req.protocol;
-        const host = req.get('host');
-
         if (req.files.avatar && req.files.avatar[0]) {
           const avatarFile = req.files.avatar[0];
-          updateData.avatarUrl = `${protocol}://${host}/uploads/${avatarFile.filename}`;
+          updateData.avatarUrl = `/uploads/${avatarFile.filename}`;
         }
 
         if (req.files.banner && req.files.banner[0]) {
           const bannerFile = req.files.banner[0];
-          updateData.bannerUrl = `${protocol}://${host}/uploads/${bannerFile.filename}`;
+          updateData.bannerUrl = `/uploads/${bannerFile.filename}`;
         }
       }
 
@@ -434,9 +431,7 @@ class UserController {
 
       if (avatarUrl !== undefined && !updateData.avatarUrl) {
         if (avatarUrl && avatarUrl.startsWith('data:image/')) {
-          const protocol = req.protocol;
-          const host = req.get('host');
-          const savedUrl = saveBase64Image(avatarUrl, protocol, host);
+          const savedUrl = saveBase64Image(avatarUrl);
           if (savedUrl) {
             updateData.avatarUrl = savedUrl;
           }
@@ -447,9 +442,7 @@ class UserController {
 
       if (bannerUrl !== undefined && !updateData.bannerUrl) {
         if (bannerUrl && bannerUrl.startsWith('data:image/')) {
-          const protocol = req.protocol;
-          const host = req.get('host');
-          const savedUrl = saveBase64Image(bannerUrl, protocol, host);
+          const savedUrl = saveBase64Image(bannerUrl);
           if (savedUrl) {
             updateData.bannerUrl = savedUrl;
           }
