@@ -9,6 +9,11 @@ const env = require('../configs/env');
 const normalizeUploadUrl = (url, req) => {
   if (!url || typeof url !== 'string') return url;
 
+  // Nếu là ảnh base64 (data URI), bỏ qua không xử lý
+  if (url.startsWith('data:')) {
+    return url;
+  }
+
   // Nếu url chứa đường dẫn uploads
   if (url.includes('/uploads/')) {
     // Cắt lấy phần path bắt đầu từ /uploads/
