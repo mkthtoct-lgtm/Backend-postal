@@ -130,6 +130,18 @@ class CommissionController {
 
       const updated = await commissionService.updateCommissionStatus(id, status);
 
+      // ĐỒNG BỘ CRM: Đẩy thông tin trạng thái hoa hồng (đối soát) lên BizFly CRM
+      try {
+        const Lead = require('../models/Lead');
+        const lead = await Lead.findById(updated.leadId);
+        if (lead) {
+          const crmService = require('../services/crm.service');
+          await crmService.forwardToBizFly(lead);
+        }
+      } catch (crmErr) {
+        console.error('[CommissionController] Lỗi khi đồng bộ cập nhật hoa hồng lên BizFly CRM:', crmErr.message);
+      }
+
       return res.status(200).json({
         success: true,
         message: 'Cập nhật trạng thái đối soát hoa hồng thành công.',

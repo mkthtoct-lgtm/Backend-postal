@@ -29,6 +29,7 @@ const env = {
   },
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   BIZFLY_WEBHOOK_URL: process.env.BIZFLY_WEBHOOK_URL || '',
+  BACKEND_URL: process.env.BACKEND_URL || '',
 };
 
 module.exports = env;
