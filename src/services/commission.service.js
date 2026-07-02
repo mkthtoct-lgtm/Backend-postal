@@ -293,6 +293,7 @@ class CommissionService {
 
     const items = await Commission.find(filter)
       .populate('collaboratorId', 'fullName email phone')
+      .populate('leadId', 'phone email note')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parsedLimit)
@@ -303,7 +304,10 @@ class CommissionService {
     return {
       items: items.map(item => ({
         id: item._id.toString(),
-        leadId: item.leadId.toString(),
+        leadId: item.leadId ? (item.leadId._id || item.leadId).toString() : '',
+        customerPhone: item.leadId?.phone || '',
+        customerEmail: item.leadId?.email || '',
+        note: item.leadId?.note || '',
         collaborator: item.collaboratorId ? {
           id: item.collaboratorId._id.toString(),
           fullName: item.collaboratorId.fullName,
