@@ -32,6 +32,7 @@ jobs:
           script: |
             set -e
             cd ${{ env.VPS_PATH }}
+            git reset --hard
             git pull origin main
             npm ci
             pm2 restart backend_09_Postal --update-env
