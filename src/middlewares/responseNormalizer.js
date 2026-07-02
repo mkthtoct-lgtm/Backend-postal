@@ -10,7 +10,15 @@ const responseNormalizer = (req, res, next) => {
     const deepNormalize = (obj) => {
       if (obj === null || obj === undefined) return obj;
       if (typeof obj === 'string') {
-        return normalizeUploadUrl(obj, req);
+        // Chỉ xử lý chuỗi trông như URL tĩnh, tránh xử lý base64 hoặc văn bản thông thường
+        if (
+          obj.startsWith('http') ||
+          obj.startsWith('/uploads/') ||
+          obj.includes('drive.google.com')
+        ) {
+          return normalizeUploadUrl(obj, req);
+        }
+        return obj;
       }
       if (Array.isArray(obj)) {
         return obj.map(deepNormalize);
