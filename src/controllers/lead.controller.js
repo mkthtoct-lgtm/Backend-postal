@@ -213,7 +213,7 @@ class LeadController {
       const hasReadPermission = userRole && (userRole.permissions.includes('*') || userRole.permissions.includes('users:read'));
 
       let leads;
-      if (userRoleSlug === 'admin' || userRoleSlug === 'board_of_directors' || hasReadPermission) {
+      if (userRoleSlug === 'admin' || userRoleSlug === 'board_of_directors' || userRoleSlug === 'bangiamdoc' || hasReadPermission) {
         // Quản trị viên/Ban Giám Đốc/Người có quyền: Lấy tất cả lead
         leads = await leadService.findAll({ search, status });
       } else if (userRoleSlug === 'congtacvien') {
@@ -256,7 +256,7 @@ class LeadController {
       const userRole = await Role.findById(req.user.roleId).lean();
       const userRoleSlug = userRole?.slug;
 
-      if (userRoleSlug !== 'admin' && userRoleSlug !== 'board_of_directors') {
+      if (userRoleSlug !== 'admin' && userRoleSlug !== 'board_of_directors' && userRoleSlug !== 'bangiamdoc') {
         return res.status(403).json({
           success: false,
           message: 'Bạn không có quyền cập nhật trạng thái đơn hàng. Chỉ Admin và Ban Giám Đốc mới được phép thực hiện.'

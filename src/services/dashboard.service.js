@@ -103,7 +103,7 @@ class DashboardService {
       }));
 
       return {
-        role: 'board_of_directors',
+        role: 'bangiamdoc',
         roleName: 'Ban Giám Đốc',
         stats: {
           totalUsers,
@@ -405,11 +405,11 @@ class DashboardService {
         throw new Error('Không thể xác định role của người dùng.');
       }
 
-      const isAdmin = role.slug === 'admin' || role.slug === 'board_of_directors';
+      const isAdmin = role.slug === 'admin' || role.slug === 'board_of_directors' || role.slug === 'bangiamdoc';
       const requestedType = (options.dashboardType || '').toString().trim().toLowerCase();
 
       if (isAdmin && requestedType) {
-        if (['board-of-directors', 'board_of_directors', 'boardofdirectors'].includes(requestedType)) {
+        if (['board-of-directors', 'board_of_directors', 'boardofdirectors', 'bangiamdoc'].includes(requestedType)) {
           return await this.getBoardOfDirectorsDashboard();
         }
 
@@ -445,8 +445,8 @@ class DashboardService {
         throw new Error('Loại dashboard không hợp lệ. Hãy chọn board-of-directors, department-head hoặc employee.');
       }
 
-      // BGĐ (board_of_directors) → Dashboard tổng quan
-      if (role.slug === 'board_of_directors' || role.slug === 'admin') {
+      // BGĐ (board_of_directors / bangiamdoc) → Dashboard tổng quan
+      if (role.slug === 'board_of_directors' || role.slug === 'bangiamdoc' || role.slug === 'admin') {
         return await this.getBoardOfDirectorsDashboard();
       }
 

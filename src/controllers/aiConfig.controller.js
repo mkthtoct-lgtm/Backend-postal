@@ -147,10 +147,24 @@ class AiConfigController {
    */
   async getHistory(req, res) {
     try {
-      // Tạm thời trả về mảng rỗng để không bị lỗi trên UI
+      const history = await aiConfigService.getHistory();
+      // Ánh xạ các trường phù hợp với định dạng FE mong đợi
+      const formattedHistory = history.map((item) => ({
+        id: item._id.toString(),
+        question: item.question,
+        answerStatus: item.status === 'answered' ? 'answered' : 'pending',
+        userName: item.askedBy || 'Anonymous',
+        userEmail: item.askedByEmail || '',
+        topic: item.topic || 'General',
+        source: item.source || 'Chatbot',
+        confidence: item.status === 'answered' ? 90 : 40,
+        usedSources: item.suggestedDocuments ? item.suggestedDocuments.map((doc) => doc.title) : [],
+        createdAt: item.createdAt,
+      }));
+
       return res.status(200).json({
         success: true,
-        data: [],
+        data: formattedHistory,
       });
     } catch (error) {
       console.error('[AiConfigController] Lỗi getHistory:', error);

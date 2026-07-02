@@ -53,6 +53,7 @@ class SopController {
       if (
         roleName !== 'admin' &&
         roleName !== 'board_of_directors' &&
+        roleName !== 'bangiamdoc' &&
         sop.allowedRoles &&
         !sop.allowedRoles.includes('all') &&
         !sop.allowedRoles.includes(roleName)

@@ -20,7 +20,7 @@ class DepartmentController {
       let includeHidden = false;
       if (req.query.includeHidden === 'true' && req.user) {
         const role = await Role.findById(req.user.roleId);
-        if (role && (role.slug === 'admin' || role.slug === 'board_of_directors')) {
+        if (role && (role.slug === 'admin' || role.slug === 'board_of_directors' || role.slug === 'bangiamdoc')) {
           includeHidden = true;
         }
       }
