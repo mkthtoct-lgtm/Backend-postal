@@ -31,7 +31,7 @@ class SopService {
 
     // Phân quyền theo vai trò (allowedRoles)
     // Nếu không phải admin hoặc ban giám đốc thì chỉ lấy các SOP mà allowedRoles chứa roleName hoặc 'all'
-    if (roleName && roleName !== 'admin' && roleName !== 'board_of_directors') {
+    if (roleName && roleName !== 'admin' && roleName !== 'board_of_directors' && roleName !== 'bangiamdoc') {
       const roleFilter = { allowedRoles: { $in: ['all', roleName] } };
       if (filter.$or) {
         filter.$and = [

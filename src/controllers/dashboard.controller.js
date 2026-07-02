@@ -73,7 +73,7 @@ class DashboardController {
       const Department = require('../models/Department');
       const userRoleData = await Role.findById(userRole).lean();
       const userRoleSlug = userRoleData?.slug;
-      const isAdmin = userRoleSlug === 'admin' || userRoleSlug === 'board_of_directors';
+      const isAdmin = userRoleSlug === 'admin' || userRoleSlug === 'board_of_directors' || userRoleSlug === 'bangiamdoc';
 
       let departmentId = req.params.departmentId || req.query.departmentId || req.query.departmentid || req.query.department_id || req.user.departmentId;
 
@@ -131,7 +131,7 @@ class DashboardController {
       const User = require('../models/User');
       const userRoleData = await Role.findById(userRole).lean();
       const userRoleSlug = userRoleData?.slug;
-      const isAdmin = userRoleSlug === 'admin' || userRoleSlug === 'board_of_directors';
+      const isAdmin = userRoleSlug === 'admin' || userRoleSlug === 'board_of_directors' || userRoleSlug === 'bangiamdoc';
 
       let userId = req.query.userId || req.user.sub || req.user.id;
 
@@ -179,7 +179,7 @@ class DashboardController {
       const Role = require('../models/Role');
       const userRoleData = await Role.findById(userRole).lean();
       const userRoleSlug = userRoleData?.slug;
-      const isAdmin = userRoleSlug === 'admin' || userRoleSlug === 'board_of_directors';
+      const isAdmin = userRoleSlug === 'admin' || userRoleSlug === 'board_of_directors' || userRoleSlug === 'bangiamdoc';
 
       let userId = req.query.userId || req.user.sub || req.user.id;
 
@@ -219,7 +219,7 @@ class DashboardController {
       const Role = require('../models/Role');
       const userRoleData = await Role.findById(userRole).lean();
       const userRoleSlug = userRoleData?.slug;
-      const isAdmin = userRoleSlug === 'admin' || userRoleSlug === 'board_of_directors';
+      const isAdmin = userRoleSlug === 'admin' || userRoleSlug === 'board_of_directors' || userRoleSlug === 'bangiamdoc';
 
       let userId = req.query.userId || req.user.sub || req.user.id;
 
@@ -259,7 +259,7 @@ class DashboardController {
       const Role = require('../models/Role');
       const userRoleData = await Role.findById(userRole).lean();
       const userRoleSlug = userRoleData?.slug;
-      const isAdmin = userRoleSlug === 'admin' || userRoleSlug === 'board_of_directors';
+      const isAdmin = userRoleSlug === 'admin' || userRoleSlug === 'board_of_directors' || userRoleSlug === 'bangiamdoc';
 
       let userId = req.query.userId || req.user.sub || req.user.id;
 

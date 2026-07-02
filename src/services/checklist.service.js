@@ -28,8 +28,8 @@ class ChecklistService {
       ];
     }
 
-    // Nếu không phải admin/board_of_directors, thực hiện lọc theo phân quyền gán người dùng hoặc vai trò
-    if (roleName && roleName !== 'admin' && roleName !== 'board_of_directors') {
+    // Nếu không phải admin/board_of_directors/bangiamdoc, thực hiện lọc theo phân quyền gán người dùng hoặc vai trò
+    if (roleName && roleName !== 'admin' && roleName !== 'board_of_directors' && roleName !== 'bangiamdoc') {
       const authConditions = [
         { allowedRoles: { $in: ['all', roleName] } }
       ];

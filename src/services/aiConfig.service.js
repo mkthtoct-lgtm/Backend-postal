@@ -144,6 +144,15 @@ class AiConfigService {
       { returnDocument: 'after', runValidators: true }
     );
   }
+
+  /**
+   * Lấy lịch sử tất cả các câu hỏi AI (không bị xóa mềm)
+   */
+  async getHistory() {
+    return await AiQuestion.find({
+      deletedAt: null
+    }).sort({ createdAt: -1 });
+  }
 }
 
 module.exports = new AiConfigService();

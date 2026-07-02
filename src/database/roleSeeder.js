@@ -12,7 +12,7 @@ const rolesToSeed = [
   {
     _id: new mongoose.Types.ObjectId('69fc5af582ef85451120772b'),
     name: 'Ban Giám Đốc',
-    slug: 'board_of_directors',
+    slug: 'bangiamdoc',
     permissions: [
       'departments:read',
       'departments:write',

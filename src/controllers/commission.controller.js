@@ -71,7 +71,7 @@ class CommissionController {
       const userRole = await Role.findById(req.user.roleId).lean();
       const userRoleSlug = userRole?.slug;
 
-      if (userRoleSlug !== 'admin' && userRoleSlug !== 'board_of_directors') {
+      if (userRoleSlug !== 'admin' && userRoleSlug !== 'board_of_directors' && userRoleSlug !== 'bangiamdoc') {
         return res.status(403).json({
           success: false,
           message: 'Bạn không có quyền truy cập dữ liệu đối soát hoa hồng.'
@@ -111,7 +111,7 @@ class CommissionController {
       const userRole = await Role.findById(req.user.roleId).lean();
       const userRoleSlug = userRole?.slug;
 
-      if (userRoleSlug !== 'admin' && userRoleSlug !== 'board_of_directors') {
+      if (userRoleSlug !== 'admin' && userRoleSlug !== 'board_of_directors' && userRoleSlug !== 'bangiamdoc') {
         return res.status(403).json({
           success: false,
           message: 'Bạn không có quyền phê duyệt hoa hồng.'
