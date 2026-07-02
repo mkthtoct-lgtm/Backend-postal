@@ -22,6 +22,7 @@ const checklistRoutes = require('./routes/checklist.routes');
 const aiConfigRoutes = require('./routes/aiConfig.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 const env = require('./configs/env');
+const responseNormalizer = require('./middlewares/responseNormalizer');
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 app.use(express.json());
+app.use(responseNormalizer);
 
 // Cấu hình phục vụ file tĩnh vật lý từ thư mục /uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

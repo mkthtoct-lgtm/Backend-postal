@@ -14,11 +14,15 @@ class CrmService {
       // Trích xuất thông tin Cộng tác viên / Người giới thiệu từ database
       let collaborator = null;
       if (lead.collaboratorId) {
-        try {
-          const User = require('../models/User');
-          collaborator = await User.findById(lead.collaboratorId).lean();
-        } catch (dbErr) {
-          console.error('[CrmService] Lỗi khi truy vấn thông tin CTV từ db:', dbErr.message);
+        if (typeof lead.collaboratorId === 'object' && lead.collaboratorId.fullName) {
+          collaborator = lead.collaboratorId;
+        } else {
+          try {
+            const User = require('../models/User');
+            collaborator = await User.findById(lead.collaboratorId).lean();
+          } catch (dbErr) {
+            console.error('[CrmService] Lỗi khi truy vấn thông tin CTV từ db:', dbErr.message);
+          }
         }
       }
 
@@ -39,19 +43,24 @@ class CrmService {
       };
       const statusText = statusMapping[lead.status] || 'Đang tư vấn';
 
-      // 2. Tìm thông tin hoa hồng/đơn hàng nếu có
+      // 2. Tìm thông tin hoa hồng/đơn hàng nếu có (truy vấn không phân biệt trạng thái để hỗ trợ đồng bộ đối soát)
       let orderInfoText = '';
       let commissionDetails = null;
-      if (lead.status === 'xu_ly_ho_so') {
-        try {
-          const Commission = require('../models/Commission');
-          commissionDetails = await Commission.findOne({ leadId: lead._id }).lean();
-          if (commissionDetails) {
-            orderInfoText = `. Giá trị đơn hàng: ${commissionDetails.productPrice.toLocaleString('vi-VN')} VND. Hoa hồng CTV: ${commissionDetails.commissionAmount.toLocaleString('vi-VN')} VND (Tỷ lệ: ${(commissionDetails.commissionRate * 100).toFixed(0)}%)`;
-          }
-        } catch (dbErr) {
-          console.error('[CrmService] Lỗi khi truy vấn thông tin hoa hồng từ db:', dbErr.message);
+      try {
+        const Commission = require('../models/Commission');
+        commissionDetails = await Commission.findOne({ leadId: lead._id }).lean();
+        if (commissionDetails) {
+          const commStatusMapping = {
+            pending: 'Chờ đối soát',
+            approved: 'Đã đối soát',
+            paid: 'Đã thanh toán',
+            cancelled: 'Hủy bỏ'
+          };
+          const commStatusText = commStatusMapping[commissionDetails.status] || 'Chờ đối soát';
+          orderInfoText = `. Giá trị đơn hàng: ${commissionDetails.productPrice.toLocaleString('vi-VN')} VND. Hoa hồng CTV: ${commissionDetails.commissionAmount.toLocaleString('vi-VN')} VND (Tỷ lệ: ${(commissionDetails.commissionRate * 100).toFixed(0)}%). Trạng thái đối soát: ${commStatusText}`;
         }
+      } catch (dbErr) {
+        console.error('[CrmService] Lỗi khi truy vấn thông tin hoa hồng từ db:', dbErr.message);
       }
 
       const description = `Trạng thái: ${statusText}${orderInfoText}. Dịch vụ quan tâm: ${lead.productInterest}. Quốc gia: ${lead.countryInterest}. Ngân sách: ${lead.budgetRange}. Mức độ cấp thiết: ${lead.urgency}. Kênh liên hệ: ${lead.preferredContact}. Ghi chú CTV: ${lead.note}. Người giới thiệu: ${collaboratorInfo}`;
@@ -80,6 +89,7 @@ class CrmService {
         product_price: commissionDetails ? commissionDetails.productPrice : 0,
         commission_amount: commissionDetails ? commissionDetails.commissionAmount : 0,
         commission_rate: commissionDetails ? commissionDetails.commissionRate : 0,
+        commission_status: commissionDetails ? commissionDetails.status : null,
 
         // Định dạng camelCase (tương thích với mô tả hướng dẫn ở Frontend và cấu hình mapping CRM cũ)
         customerName: lead.customerName,
@@ -90,8 +100,8 @@ class CrmService {
         collaboratorName: collaboratorName,
         statusKey: lead.status,
         productPrice: commissionDetails ? commissionDetails.productPrice : 0,
-        commissionAmount: commissionDetails ? commissionDetails.commissionAmount : 0
-        collaboratorName: collaboratorName
+        commissionAmount: commissionDetails ? commissionDetails.commissionAmount : 0,
+        commissionStatus: commissionDetails ? commissionDetails.status : null
       };
 
       console.log(`[Bizfly CRM] Bắt đầu đẩy lead lên BizFly...`, payload);

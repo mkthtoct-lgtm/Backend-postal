@@ -29,7 +29,7 @@ const env = {
   },
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   BIZFLY_WEBHOOK_URL: process.env.BIZFLY_WEBHOOK_URL || '',
-  BIZFLY_WEBHOOK_URL: process.env.BIZFLY_WEBHOOK_URL || 'https://crm.bizfly.vn/public-api/public/webhook?id=6a2b72434cee0da9cf07775e&crm_token=c6a5a2b4af9dcb0806470a2ae859234006f2d050&project_id=695b85c8320583313135ddfa',
+  BACKEND_URL: process.env.BACKEND_URL || '',
 };
 
 module.exports = env;
