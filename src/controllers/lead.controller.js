@@ -138,12 +138,17 @@ class LeadController {
 
       const lead = await leadService.create(leadData);
 
-      // 2. Gọi API BizFly CRM Webhook để đồng bộ thông tin khách hàng
-      const crmResult = await crmService.forwardToBizFly(lead);
-      if (crmResult.success && crmResult.bizflyContactId) {
-        lead.bizflyContactId = crmResult.bizflyContactId.toString();
-        await lead.save();
-      }
+      // 2. Gọi API BizFly CRM Webhook để đồng bộ thông tin khách hàng (Chạy nền không chặn để phản hồi nhanh)
+      crmService.forwardToBizFly(lead)
+        .then(async (crmResult) => {
+          if (crmResult.success && crmResult.bizflyContactId) {
+            lead.bizflyContactId = crmResult.bizflyContactId.toString();
+            await lead.save();
+          }
+        })
+        .catch((crmErr) => {
+          console.error('[CrmService] Lỗi đồng bộ nền BizFly CRM:', crmErr.message);
+        });
 
       // 3. Ghi lịch sử thao tác (chỉ ghi nếu có collaborator thực hiện)
       if (collaboratorId) {
