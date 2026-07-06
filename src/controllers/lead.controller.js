@@ -138,6 +138,16 @@ class LeadController {
 
       const lead = await leadService.create(leadData);
 
+      // Nếu trạng thái của lead khi tạo mới trực tiếp là 'xu_ly_ho_so' (deal thành công), tự động tính hoa hồng
+      if (lead.status === 'xu_ly_ho_so') {
+        try {
+          const commissionService = require('../services/commission.service');
+          await commissionService.calculateCommission(lead._id);
+        } catch (commErr) {
+          console.error('[LeadController] Lỗi khi tự động tính hoa hồng đơn hàng lúc tạo mới:', commErr.message);
+        }
+      }
+
       // 2. Gọi API BizFly CRM Webhook để đồng bộ thông tin khách hàng (Chạy nền không chặn để phản hồi nhanh)
       crmService.forwardToBizFly(lead)
         .then(async (crmResult) => {
