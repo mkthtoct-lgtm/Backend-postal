@@ -21,6 +21,10 @@ const roleSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    isHidden: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true, // Tự động tạo createdAt và updatedAt
