@@ -16,6 +16,12 @@ const DEFAULT_COMMISSION_CONFIG = {
   daiSuTanTamMaster: 10
 };
 
+const normalizePercentage = (value, fallback) => {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(0, Math.min(100, number));
+};
+
 class SystemSettingController {
   /**
    * Lấy cấu hình công khai của Chatbot AI (dành cho mọi người dùng đã đăng nhập)
@@ -121,12 +127,12 @@ class SystemSettingController {
       } = req.body;
 
       const cleanCommissionConfig = {
-        khachHangThanThiet: parseFloat(khachHangThanThiet) || DEFAULT_COMMISSION_CONFIG.khachHangThanThiet,
-        daiSuGieoMamDong: parseFloat(daiSuGieoMamDong) || DEFAULT_COMMISSION_CONFIG.daiSuGieoMamDong,
-        daiSuKetNoiBac: parseFloat(daiSuKetNoiBac) || DEFAULT_COMMISSION_CONFIG.daiSuKetNoiBac,
-        daiSuTruCotVang: parseFloat(daiSuTruCotVang) || DEFAULT_COMMISSION_CONFIG.daiSuTruCotVang,
-        daiSuTinhAnhKimCuong: parseFloat(daiSuTinhAnhKimCuong) || DEFAULT_COMMISSION_CONFIG.daiSuTinhAnhKimCuong,
-        daiSuTanTamMaster: parseFloat(daiSuTanTamMaster) || DEFAULT_COMMISSION_CONFIG.daiSuTanTamMaster,
+        khachHangThanThiet: normalizePercentage(khachHangThanThiet, DEFAULT_COMMISSION_CONFIG.khachHangThanThiet),
+        daiSuGieoMamDong: normalizePercentage(daiSuGieoMamDong, DEFAULT_COMMISSION_CONFIG.daiSuGieoMamDong),
+        daiSuKetNoiBac: normalizePercentage(daiSuKetNoiBac, DEFAULT_COMMISSION_CONFIG.daiSuKetNoiBac),
+        daiSuTruCotVang: normalizePercentage(daiSuTruCotVang, DEFAULT_COMMISSION_CONFIG.daiSuTruCotVang),
+        daiSuTinhAnhKimCuong: normalizePercentage(daiSuTinhAnhKimCuong, DEFAULT_COMMISSION_CONFIG.daiSuTinhAnhKimCuong),
+        daiSuTanTamMaster: normalizePercentage(daiSuTanTamMaster, DEFAULT_COMMISSION_CONFIG.daiSuTanTamMaster),
       };
 
       const updated = await systemSettingService.updateSetting('commission_config', cleanCommissionConfig);

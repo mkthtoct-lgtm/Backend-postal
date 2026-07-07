@@ -52,6 +52,7 @@ const toCleanUserResponse = (user) => {
     avatarUrl: user.avatarUrl || null,
     bannerUrl: user.bannerUrl || null,
     roleId: user.roleId ? (user.roleId._id || user.roleId) : null,
+    rank: user.rank || null,
     departmentId: user.departmentId || null,
     status: user.status,
     hasSeenAdminTutorial: user.hasSeenAdminTutorial || false,
