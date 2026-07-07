@@ -86,7 +86,7 @@ const userSchema = new mongoose.Schema(
     },
     rank: {
       type: String,
-      enum: ['Bronze', 'Silver', 'Gold', 'Daimion', 'Master'],
+      enum: ['Loyal', 'Bronze', 'Silver', 'Gold', 'Daimion', 'Master'],
       default: 'Bronze',
     },
     lastLoginAt: {
