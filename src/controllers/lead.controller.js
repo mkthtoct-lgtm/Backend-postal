@@ -116,6 +116,46 @@ class LeadController {
       }
 
       // 1. Lưu trữ thông tin lead cục bộ dưới trạng thái mặc định "dang_tu_van" hoặc trạng thái gửi từ body
+      let existingBizflyContactId = null;
+      try {
+        const Lead = require('../models/Lead');
+        let searchPhone = phone.trim().replace(/[^0-9+]/g, '');
+        if (searchPhone.startsWith('+84')) {
+          searchPhone = '0' + searchPhone.slice(3);
+        } else if (searchPhone.startsWith('84') && searchPhone.length > 9) {
+          searchPhone = '0' + searchPhone.slice(2);
+        }
+
+        let searchPhoneNoZero = searchPhone;
+        if (searchPhone.startsWith('0')) {
+          searchPhoneNoZero = searchPhone.slice(1);
+        }
+
+        let existingLead = await Lead.findOne({
+          $or: [
+            { phone: phone.trim() },
+            { phone: searchPhone },
+            { phone: searchPhoneNoZero }
+          ],
+          bizflyContactId: { $ne: null },
+          deletedAt: null
+        }).sort({ createdAt: -1 }).lean();
+
+        if (!existingLead && email) {
+          existingLead = await Lead.findOne({
+            email: email.trim().toLowerCase(),
+            bizflyContactId: { $ne: null },
+            deletedAt: null
+          }).sort({ createdAt: -1 }).lean();
+        }
+
+        if (existingLead) {
+          existingBizflyContactId = existingLead.bizflyContactId;
+        }
+      } catch (dbErr) {
+        console.error('[LeadController] Lỗi khi tìm lead trùng để lấy bizflyContactId:', dbErr.message);
+      }
+
       const leadData = {
         collaboratorId,
         customerName: customerName.trim(),
@@ -133,7 +173,8 @@ class LeadController {
         cccdFrontFileId,
         cccdFrontUrl,
         cccdBackFileId,
-        cccdBackUrl
+        cccdBackUrl,
+        bizflyContactId: existingBizflyContactId
       };
 
       const lead = await leadService.create(leadData);
@@ -432,6 +473,14 @@ class LeadController {
           success: false,
           message: 'Không tìm thấy khách hàng tương ứng trong cơ sở dữ liệu Website.'
         });
+      }
+
+      // Lưu lại bizflyContactId từ CRM gửi về nếu chưa có hoặc khác biệt
+      const bizflyContactId = payload.ma_khach_hang || payload.contact_id || payload.id || (payload.contact && (payload.contact.id || payload.contact.contact_id || payload.contact.ma_khach_hang));
+      if (bizflyContactId && lead.bizflyContactId !== String(bizflyContactId)) {
+        lead.bizflyContactId = String(bizflyContactId);
+        await lead.save();
+        console.log(`[Bizfly Webhook] Đã cập nhật và lưu bizflyContactId = ${bizflyContactId} cho lead: ${lead._id}`);
       }
 
       // 5. Cập nhật trạng thái nếu có thay đổi
