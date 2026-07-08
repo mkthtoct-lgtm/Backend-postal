@@ -70,8 +70,17 @@ class CommissionController {
     try {
       const userRole = await Role.findById(req.user.roleId).lean();
       const userRoleSlug = userRole?.slug;
+      const permissions = Array.isArray(userRole?.permissions) ? userRole.permissions : [];
 
-      if (userRoleSlug !== 'admin' && userRoleSlug !== 'board_of_directors' && userRoleSlug !== 'bangiamdoc') {
+      const hasPermission = userRoleSlug === 'admin' || 
+                            userRoleSlug === 'board_of_directors' || 
+                            userRoleSlug === 'bangiamdoc' ||
+                            permissions.includes('*') ||
+                            permissions.includes('settings:manage') ||
+                            permissions.includes('commissions:read') ||
+                            permissions.includes('commissions:write');
+
+      if (!hasPermission) {
         return res.status(403).json({
           success: false,
           message: 'Bạn không có quyền truy cập dữ liệu đối soát hoa hồng.'
@@ -110,8 +119,16 @@ class CommissionController {
     try {
       const userRole = await Role.findById(req.user.roleId).lean();
       const userRoleSlug = userRole?.slug;
+      const permissions = Array.isArray(userRole?.permissions) ? userRole.permissions : [];
 
-      if (userRoleSlug !== 'admin' && userRoleSlug !== 'board_of_directors' && userRoleSlug !== 'bangiamdoc') {
+      const hasPermission = userRoleSlug === 'admin' || 
+                            userRoleSlug === 'board_of_directors' || 
+                            userRoleSlug === 'bangiamdoc' ||
+                            permissions.includes('*') ||
+                            permissions.includes('settings:manage') ||
+                            permissions.includes('commissions:write');
+
+      if (!hasPermission) {
         return res.status(403).json({
           success: false,
           message: 'Bạn không có quyền phê duyệt hoa hồng.'

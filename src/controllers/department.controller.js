@@ -25,7 +25,7 @@ class DepartmentController {
         }
       }
 
-      const departments = await departmentService.findAll(includeHidden);
+      const departments = await departmentService.findAll(includeHidden, req.user?.departmentId);
 
       return res.status(200).json({
         success: true,

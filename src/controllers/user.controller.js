@@ -2,6 +2,27 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const userService = require('../services/user.service');
 
+const PERMISSION_ALIASES = {
+  'documents:view': 'documents:read',
+  'documents:upload': 'documents:write',
+  'documents:edit': 'documents:write',
+  'documents:delete': 'documents:write',
+  'notifications:view': 'notifications:read',
+  'notifications:create': 'notifications:write',
+  'users:view': 'users:read',
+  'users:edit': 'users:write',
+  'users:lock': 'users:write',
+};
+
+const expandPermissions = (permissions = []) => {
+  const expanded = new Set();
+  permissions.filter(Boolean).forEach((permission) => {
+    expanded.add(permission);
+    if (PERMISSION_ALIASES[permission]) expanded.add(PERMISSION_ALIASES[permission]);
+  });
+  return Array.from(expanded);
+};
+
 // Hàm helper kiểm tra định dạng email hợp lệ
 const validateEmailFormat = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -34,6 +55,10 @@ const validatePasswordComplexity = (password) => {
 // Hàm helper làm sạch và chuyển đổi User object chỉ giữ lại các trường của Mongoose Schema
 const toCleanUserResponse = (user) => {
   if (!user) return null;
+  const rolePermissions = user.roleId && Array.isArray(user.roleId.permissions)
+    ? user.roleId.permissions
+    : [];
+  const grantedPermissions = Array.isArray(user.grantedPermissions) ? user.grantedPermissions : [];
   return {
     _id: user._id.toString(),
     fullName: user.fullName,
@@ -52,6 +77,9 @@ const toCleanUserResponse = (user) => {
     avatarUrl: user.avatarUrl || null,
     bannerUrl: user.bannerUrl || null,
     roleId: user.roleId ? (user.roleId._id || user.roleId) : null,
+    role: user.roleId && user.roleId.slug ? user.roleId.slug : null,
+    permissions: expandPermissions([...rolePermissions, ...grantedPermissions]),
+    grantedPermissions,
     rank: user.rank || null,
     departmentId: user.departmentId || null,
     status: user.status,
@@ -290,7 +318,7 @@ class UserController {
   async updateUser(req, res) {
     try {
       const { id } = req.params;
-      const { email, fullName, phone, status, roleId, departmentId, socialLink, zaloLink, instagramLink, city, ward, addressDetail, avatarUrl, bannerUrl, hasSeenAdminTutorial, seenTours } = req.body;
+      const { email, fullName, phone, status, roleId, departmentId, socialLink, zaloLink, instagramLink, city, ward, addressDetail, avatarUrl, bannerUrl, hasSeenAdminTutorial, seenTours, grantedPermissions } = req.body;
 
       // Kiểm tra định dạng ObjectId
       if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -314,16 +342,21 @@ class UserController {
       const isChangingRole = roleId !== undefined && roleId.toString() !== (user.roleId ? user.roleId.toString() : '');
       const isChangingDept = departmentId !== undefined && (departmentId ? departmentId.toString() : null) !== (user.departmentId ? user.departmentId.toString() : null);
       const isChangingStatus = status !== undefined && status !== user.status;
+      const isChangingGrantedPermissions = grantedPermissions !== undefined;
 
-      if (isChangingRole || isChangingDept || isChangingStatus) {
+      if (isChangingRole || isChangingDept || isChangingStatus || isChangingGrantedPermissions) {
         const Role = require('../models/Role');
         const userRole = await Role.findById(req.user.roleId);
-        const hasWritePermission = userRole && (userRole.permissions.includes('*') || userRole.permissions.includes('users:write'));
+        const effectivePermissions = expandPermissions([
+          ...(Array.isArray(userRole?.permissions) ? userRole.permissions : []),
+          ...(Array.isArray(req.user.grantedPermissions) ? req.user.grantedPermissions : []),
+        ]);
+        const hasWritePermission = effectivePermissions.includes('*') || effectivePermissions.includes('users:write');
 
         if (!hasWritePermission) {
           return res.status(403).json({
             success: false,
-            message: 'Bạn không có quyền thay đổi các thông tin quản trị nhạy cảm (vai trò, phòng ban, trạng thái).',
+            message: 'Bạn không có quyền thay đổi các thông tin quản trị nhạy cảm (vai trò, phòng ban, trạng thái, quyền chức năng).',
           });
         }
       }
@@ -336,6 +369,12 @@ class UserController {
 
       if (seenTours !== undefined) {
         updateData.seenTours = Array.isArray(seenTours) ? seenTours : [];
+      }
+
+      if (grantedPermissions !== undefined) {
+        updateData.grantedPermissions = Array.isArray(grantedPermissions)
+          ? grantedPermissions.filter((permission) => typeof permission === 'string' && permission.trim()).map((permission) => permission.trim())
+          : [];
       }
 
       // Xử lý các tệp tải lên nếu có (avatar, banner)

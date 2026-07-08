@@ -1,5 +1,26 @@
 const authService = require('../services/auth.service');
 
+const PERMISSION_ALIASES = {
+  'documents:view': 'documents:read',
+  'documents:upload': 'documents:write',
+  'documents:edit': 'documents:write',
+  'documents:delete': 'documents:write',
+  'notifications:view': 'notifications:read',
+  'notifications:create': 'notifications:write',
+  'users:view': 'users:read',
+  'users:edit': 'users:write',
+  'users:lock': 'users:write',
+};
+
+const expandPermissions = (permissions = []) => {
+  const expanded = new Set();
+  permissions.filter(Boolean).forEach((permission) => {
+    expanded.add(permission);
+    if (PERMISSION_ALIASES[permission]) expanded.add(PERMISSION_ALIASES[permission]);
+  });
+  return Array.from(expanded);
+};
+
 // Hàm helper kiểm tra định dạng email hợp lệ
 const validateEmailFormat = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -32,6 +53,21 @@ const validatePasswordComplexity = (password) => {
 // Hàm helper làm sạch và chuyển đổi User object chỉ giữ lại các trường của Mongoose Schema
 const toCleanUserResponse = (user) => {
   if (!user) return null;
+  const roleIdStr = user.roleId
+    ? (user.roleId._id ? user.roleId._id.toString() : user.roleId.toString())
+    : null;
+  const roleSlug = user.roleId && user.roleId.slug ? user.roleId.slug : null;
+  const rolePermissions = user.roleId && Array.isArray(user.roleId.permissions)
+    ? user.roleId.permissions
+    : [];
+  const grantedPermissions = Array.isArray(user.grantedPermissions) ? user.grantedPermissions : [];
+  const permissions = expandPermissions([...rolePermissions, ...grantedPermissions]);
+
+  const departmentIdStr = user.departmentId
+    ? (user.departmentId._id ? user.departmentId._id.toString() : user.departmentId.toString())
+    : null;
+  const departmentName = user.departmentId && user.departmentId.name ? user.departmentId.name : null;
+
   return {
     _id: user._id.toString(),
     fullName: user.fullName,
@@ -49,8 +85,12 @@ const toCleanUserResponse = (user) => {
     referred_by_user_id: user.referred_by_user_id || null,
     avatarUrl: user.avatarUrl || null,
     bannerUrl: user.bannerUrl || null,
-    roleId: user.roleId ? (user.roleId._id || user.roleId) : null,
-    departmentId: user.departmentId || null,
+    roleId: roleIdStr,
+    role: roleSlug,
+    permissions,
+    grantedPermissions,
+    departmentId: departmentIdStr,
+    departmentName,
     status: user.status,
     dealCount: user.dealCount || 0,
     lastLoginAt: user.lastLoginAt || null,
