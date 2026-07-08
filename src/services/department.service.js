@@ -7,9 +7,23 @@ class DepartmentService {
    * Lấy danh sách tất cả phòng ban chưa bị ẩn, kèm số lượng nhân sự
    * @returns {Promise<Array>} Danh sách Department có field memberCount
    */
-  async findAll(includeHidden = false) {
+  async findAll(includeHidden = false, userDepartmentId = null) {
     // Dùng aggregate để đếm memberCount từ collection users
-    const matchCondition = includeHidden ? {} : { isHidden: false };
+    let matchCondition = { isHidden: false };
+    if (includeHidden) {
+      matchCondition = {};
+    } else if (userDepartmentId) {
+      try {
+        matchCondition = {
+          $or: [
+            { isHidden: false },
+            { _id: new mongoose.Types.ObjectId(userDepartmentId) }
+          ]
+        };
+      } catch (e) {
+        matchCondition = { isHidden: false };
+      }
+    }
     const departments = await Department.aggregate([
       { $match: matchCondition },
       {

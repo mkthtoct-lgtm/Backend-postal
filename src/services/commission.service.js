@@ -16,6 +16,11 @@ const DEFAULT_COMMISSION_CONFIG = {
 
 // Bảng cấu hình tỷ lệ hoa hồng và các chỉ tiêu của từng cấp bậc
 const COMMISSION_RANKS = {
+  Loyal: {
+    rate: 0.05,
+    name: 'Khách hàng thân thiết',
+    targets: { posts: 0, referrals: 0, qualified: 0, sales: 0 }
+  },
   Bronze: {
     rate: 0.05,
     name: 'Đại sứ Gieo Mầm',
@@ -92,6 +97,7 @@ class CommissionService {
     // Đọc cấu hình tỷ lệ hoa hồng động từ DB
     const commissionConfig = await systemSettingService.getSetting('commission_config', DEFAULT_COMMISSION_CONFIG);
     const rankMapping = {
+      Loyal: 'khachHangThanThiet',
       Bronze: 'daiSuGieoMamDong',
       Silver: 'daiSuKetNoiBac',
       Gold: 'daiSuTruCotVang',
@@ -210,6 +216,7 @@ class CommissionService {
     // Đọc cấu hình tỷ lệ hoa hồng động từ DB
     const commissionConfig = await systemSettingService.getSetting('commission_config', DEFAULT_COMMISSION_CONFIG);
     const rankMapping = {
+      Loyal: 'khachHangThanThiet',
       Bronze: 'daiSuGieoMamDong',
       Silver: 'daiSuKetNoiBac',
       Gold: 'daiSuTruCotVang',
@@ -238,10 +245,10 @@ class CommissionService {
         targets: rankInfo.targets,
         isReached,
         progress: {
-          posts: Math.min(100, Math.round((postsCount / rankInfo.targets.posts) * 100)),
-          referrals: Math.min(100, Math.round((referralsCount / rankInfo.targets.referrals) * 100)),
-          qualified: Math.min(100, Math.round((qualifiedCount / rankInfo.targets.qualified) * 100)),
-          sales: Math.min(100, Math.round((salesTotal / rankInfo.targets.sales) * 100))
+          posts: rankInfo.targets.posts > 0 ? Math.min(100, Math.round((postsCount / rankInfo.targets.posts) * 100)) : 100,
+          referrals: rankInfo.targets.referrals > 0 ? Math.min(100, Math.round((referralsCount / rankInfo.targets.referrals) * 100)) : 100,
+          qualified: rankInfo.targets.qualified > 0 ? Math.min(100, Math.round((qualifiedCount / rankInfo.targets.qualified) * 100)) : 100,
+          sales: rankInfo.targets.sales > 0 ? Math.min(100, Math.round((salesTotal / rankInfo.targets.sales) * 100)) : 100
         }
       };
     });

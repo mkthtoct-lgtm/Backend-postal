@@ -28,6 +28,8 @@ const rolesToSeed = [
       'products:read',
       'products:write',
       'settings:manage',
+      'roles:read',
+      'roles:write',
     ],
     description: 'Ban giám đốc, có quyền quản trị nghiệp vụ, xem nhật ký thao tác và đăng thông báo.',
   },
@@ -125,16 +127,26 @@ const seedRoles = async () => {
     console.log('[RoleSeeder] Bắt đầu đồng bộ danh sách vai trò và quyền hạn...');
     
     for (const roleData of rolesToSeed) {
-      // Thực thi upsert (nếu chưa có thì tạo mới, có rồi thì cập nhật lại quyền hạn mới nhất)
+      const existingRole = await Role.findById(roleData._id);
+
+      if (!existingRole) {
+        await Role.create(roleData);
+        continue;
+      }
+
       await Role.findByIdAndUpdate(
-          roleData._id,
-          {
-            name: roleData.name,
-            slug: roleData.slug,
-            permissions: roleData.permissions,
-            description: roleData.description,
+        roleData._id,
+        {
+          $set: {
+            name: existingRole.name || roleData.name,
+            slug: existingRole.slug || roleData.slug,
+            description: existingRole.description || roleData.description,
           },
-          { upsert: true, new: true }
+          $setOnInsert: {
+            permissions: roleData.permissions,
+          },
+        },
+        { new: true }
       );
     }
     

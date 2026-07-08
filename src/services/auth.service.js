@@ -10,6 +10,28 @@ const PasswordResetToken = require('../models/PasswordResetToken');
 // Định cấu hình hằng số
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 phút
 const DEFAULT_REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 ngày
+const COLLABORATOR_ROLE_ID = '69fc5af682ef85451120772f';
+
+const PERMISSION_ALIASES = {
+  'documents:view': 'documents:read',
+  'documents:upload': 'documents:write',
+  'documents:edit': 'documents:write',
+  'documents:delete': 'documents:write',
+  'notifications:view': 'notifications:read',
+  'notifications:create': 'notifications:write',
+  'users:view': 'users:read',
+  'users:edit': 'users:write',
+  'users:lock': 'users:write',
+};
+
+const expandPermissions = (permissions = []) => {
+  const expanded = new Set();
+  permissions.filter(Boolean).forEach((permission) => {
+    expanded.add(permission);
+    if (PERMISSION_ALIASES[permission]) expanded.add(PERMISSION_ALIASES[permission]);
+  });
+  return Array.from(expanded);
+};
 
 const PASSWORD_RESET_RESPONSE = {
   message: 'Nếu email tồn tại trong hệ thống, liên kết đặt lại mật khẩu đã được gửi.',
@@ -36,6 +58,7 @@ class AuthService {
       fullName,
       email,
       passwordHash,
+      roleId: COLLABORATOR_ROLE_ID,
     });
 
     return this.toAuthenticatedUser(newUser);
@@ -262,7 +285,10 @@ class AuthService {
       sub: user.id,
       email: user.email,
       roleId: user.roleId,
-      departmentId: user.departmentId,
+      role: user.role || null,
+      permissions: user.permissions || [],
+      departmentId: user.departmentId || null,
+      departmentName: user.departmentName || null,
     };
 
     // Tạo refresh token ngẫu nhiên
@@ -287,10 +313,22 @@ class AuthService {
     };
   }
 
-  /**
-   * Helper chuyển đổi kiểu dữ liệu User Document thành AuthenticatedUser Format
-   */
   toAuthenticatedUser(user) {
+    const roleIdStr = user.roleId
+      ? (user.roleId._id ? user.roleId._id.toString() : user.roleId.toString())
+      : null;
+    const roleSlug = user.roleId && user.roleId.slug ? user.roleId.slug : null;
+    const rolePermissions = user.roleId && Array.isArray(user.roleId.permissions)
+      ? user.roleId.permissions
+      : [];
+    const grantedPermissions = Array.isArray(user.grantedPermissions) ? user.grantedPermissions : [];
+    const permissions = expandPermissions([...rolePermissions, ...grantedPermissions]);
+
+    const departmentIdStr = user.departmentId
+      ? (user.departmentId._id ? user.departmentId._id.toString() : user.departmentId.toString())
+      : null;
+    const departmentName = user.departmentId && user.departmentId.name ? user.departmentId.name : null;
+
     return {
       id: user._id.toString(),
       fullName: user.fullName,
@@ -305,8 +343,12 @@ class AuthService {
       ward: user.ward || null,
       addressDetail: user.addressDetail || null,
       address: user.address || null,
-      roleId: user.roleId ? user.roleId.toString() : null,
-      departmentId: user.departmentId ? user.departmentId.toString() : null,
+      roleId: roleIdStr,
+      role: roleSlug,
+      permissions,
+      grantedPermissions,
+      departmentId: departmentIdStr,
+      departmentName,
       status: user.status,
       hasSeenAdminTutorial: user.hasSeenAdminTutorial || false,
       seenTours: user.seenTours || [],

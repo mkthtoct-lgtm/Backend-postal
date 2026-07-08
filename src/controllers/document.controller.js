@@ -2,6 +2,22 @@ const mongoose = require('mongoose');
 const documentService = require('../services/document.service');
 const Role = require('../models/Role');
 
+const PERMISSION_ALIASES = {
+  'documents:view': 'documents:read',
+  'documents:upload': 'documents:write',
+  'documents:edit': 'documents:write',
+  'documents:delete': 'documents:write',
+};
+
+const expandPermissions = (permissions = []) => {
+  const expanded = new Set();
+  permissions.filter(Boolean).forEach((permission) => {
+    expanded.add(permission);
+    if (PERMISSION_ALIASES[permission]) expanded.add(PERMISSION_ALIASES[permission]);
+  });
+  return Array.from(expanded);
+};
+
 /**
  * Phân nhóm người dùng dựa trên vai trò để kiểm duyệt quyền tài liệu (quy chuẩn tương thích Frontend)
  */
@@ -24,13 +40,29 @@ const getUserGroupIds = (roleSlug) => {
   return groups;
 };
 
+const canUseDocumentAction = ({ roleSlug, rolePermissions = [], departmentId, document, action }) => {
+  if (roleSlug === 'admin') return true;
+  if (Array.isArray(rolePermissions) && (rolePermissions.includes('*') || rolePermissions.includes('documents:write'))) {
+    return true;
+  }
+
+  const rule = document.permissions?.[action] || { groups: [], roles: [], departments: [] };
+  const userGroups = getUserGroupIds(roleSlug);
+
+  return (
+    (Array.isArray(rule.groups) && rule.groups.some(group => userGroups.includes(group))) ||
+    (Array.isArray(rule.roles) && rule.roles.includes(roleSlug)) ||
+    Boolean(departmentId && Array.isArray(rule.departments) && rule.departments.includes(departmentId.toString()))
+  );
+};
+
 class DocumentController {
   /**
    * Lấy danh sách tài liệu có phân trang và bộ lọc theo danh mục
    */
   async getDocuments(req, res) {
     try {
-      let { page, limit, categoryId } = req.query;
+      let { page, limit, categoryId, departmentId } = req.query;
 
       page = parseInt(page) || 1;
       limit = parseInt(limit) || 10;
@@ -43,15 +75,27 @@ class DocumentController {
         });
       }
 
+      if (departmentId && departmentId !== 'all' && !mongoose.Types.ObjectId.isValid(departmentId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Mã phòng ban (departmentId) không hợp lệ.',
+        });
+      }
+
       // Lấy vai trò và phòng ban của user đang đăng nhập
       let roleSlug = '';
-      let departmentId = null;
+      let userDepartmentId = null;
+      let rolePermissions = [];
       if (req.user) {
-        departmentId = req.user.departmentId;
+        userDepartmentId = req.user.departmentId;
         if (req.user.roleId) {
           const role = await Role.findById(req.user.roleId);
           if (role) {
             roleSlug = role.slug;
+            rolePermissions = expandPermissions([
+              ...(Array.isArray(role.permissions) ? role.permissions : []),
+              ...(Array.isArray(req.user.grantedPermissions) ? req.user.grantedPermissions : []),
+            ]);
           }
         }
       }
@@ -61,7 +105,9 @@ class DocumentController {
         limit, 
         categoryId, 
         roleSlug, 
-        departmentId 
+        rolePermissions,
+        departmentId: userDepartmentId,
+        filterDepartmentId: departmentId,
       });
 
       return res.status(200).json({
@@ -101,26 +147,37 @@ class DocumentController {
         });
       }
 
+      let detailRoleSlug = '';
+      let detailRolePermissions = [];
+
       // Kiểm tra quyền xem tài liệu của user đăng nhập
       if (req.user) {
         let roleSlug = '';
+        let role = null;
         if (req.user.roleId) {
-          const role = await Role.findById(req.user.roleId);
+          role = await Role.findById(req.user.roleId);
           if (role) {
             roleSlug = role.slug;
           }
         }
+        detailRoleSlug = roleSlug;
+        detailRolePermissions = expandPermissions([
+          ...(Array.isArray(role?.permissions) ? role.permissions : []),
+          ...(Array.isArray(req.user.grantedPermissions) ? req.user.grantedPermissions : []),
+        ]);
 
         if (roleSlug !== 'admin') {
           const userGroups = getUserGroupIds(roleSlug);
           const permissions = document.permissions || {};
           const viewRule = permissions.view || { groups: ['all'], roles: [], departments: [] };
+          const rolePermissions = detailRolePermissions;
 
           const hasGroup = viewRule.groups && viewRule.groups.some(g => userGroups.includes(g));
           const hasRole = viewRule.roles && viewRule.roles.includes(roleSlug);
           const hasDept = req.user.departmentId && viewRule.departments && viewRule.departments.includes(req.user.departmentId.toString());
+          const hasRoleReadPermission = rolePermissions.includes('*') || rolePermissions.includes('documents:read');
 
-          if (!hasGroup && !hasRole && !hasDept) {
+          if (!hasRoleReadPermission && !hasGroup && !hasRole && !hasDept) {
             return res.status(403).json({
               success: false,
               message: 'Bạn không có quyền xem chi tiết tài liệu này.',
@@ -129,10 +186,29 @@ class DocumentController {
         }
       }
 
+      const canEdit = canUseDocumentAction({
+        roleSlug: detailRoleSlug,
+        rolePermissions: detailRolePermissions,
+        departmentId: req.user?.departmentId,
+        document,
+        action: 'edit',
+      });
+
       return res.status(200).json({
         success: true,
         message: 'Lấy thông tin chi tiết tài liệu thành công.',
-        data: document,
+        data: {
+          ...document,
+          capabilities: {
+            canEdit,
+            canDelete: canEdit,
+            canUpload: detailRoleSlug === 'admin' ||
+              (Array.isArray(detailRolePermissions) &&
+                (detailRolePermissions.includes('*') || detailRolePermissions.includes('documents:write'))),
+          },
+          canEdit,
+          canDelete: canEdit,
+        },
       });
     } catch (error) {
       return res.status(500).json({
@@ -231,14 +307,21 @@ class DocumentController {
       // Kiểm tra quyền chỉnh sửa tài liệu
       if (req.user) {
         let roleSlug = '';
+        let role = null;
         if (req.user.roleId) {
-          const role = await Role.findById(req.user.roleId);
+          role = await Role.findById(req.user.roleId);
           if (role) {
             roleSlug = role.slug;
           }
         }
 
-        if (roleSlug !== 'admin') {
+        const rolePermissions = expandPermissions([
+          ...(Array.isArray(role?.permissions) ? role.permissions : []),
+          ...(Array.isArray(req.user.grantedPermissions) ? req.user.grantedPermissions : []),
+        ]);
+        const hasWritePermission = rolePermissions.includes('*') || rolePermissions.includes('documents:write');
+
+        if (roleSlug !== 'admin' && !hasWritePermission) {
           const userGroups = getUserGroupIds(roleSlug);
           const docPermissions = existingDoc.permissions || {};
           const editRule = docPermissions.edit || { groups: ['manager'], roles: ['admin', 'truongbophan'], departments: [] };
@@ -331,14 +414,21 @@ class DocumentController {
       // Kiểm tra quyền xóa tài liệu
       if (req.user) {
         let roleSlug = '';
+        let role = null;
         if (req.user.roleId) {
-          const role = await Role.findById(req.user.roleId);
+          role = await Role.findById(req.user.roleId);
           if (role) {
             roleSlug = role.slug;
           }
         }
 
-        if (roleSlug !== 'admin') {
+        const rolePermissions = expandPermissions([
+          ...(Array.isArray(role?.permissions) ? role.permissions : []),
+          ...(Array.isArray(req.user.grantedPermissions) ? req.user.grantedPermissions : []),
+        ]);
+        const hasWritePermission = rolePermissions.includes('*') || rolePermissions.includes('documents:write');
+
+        if (roleSlug !== 'admin' && !hasWritePermission) {
           const userGroups = getUserGroupIds(roleSlug);
           const docPermissions = existingDoc.permissions || {};
           const editRule = docPermissions.edit || { groups: ['manager'], roles: ['admin', 'truongbophan'], departments: [] };

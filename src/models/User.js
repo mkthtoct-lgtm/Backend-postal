@@ -71,8 +71,8 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Role',
       required: true,
-      // Giá trị ObjectId mặc định cho USER (có thể thay đổi sau nếu cần)
-      default: () => new mongoose.Types.ObjectId('60c72b2f9b1d8b2bad000001'),
+      // Mặc định tài khoản tự đăng ký là Cộng tác viên.
+      default: () => new mongoose.Types.ObjectId('69fc5af682ef85451120772f'),
     },
     departmentId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -86,7 +86,7 @@ const userSchema = new mongoose.Schema(
     },
     rank: {
       type: String,
-      enum: ['Bronze', 'Silver', 'Gold', 'Daimion', 'Master'],
+      enum: ['Loyal', 'Bronze', 'Silver', 'Gold', 'Daimion', 'Master'],
       default: 'Bronze',
     },
     lastLoginAt: {
@@ -102,6 +102,10 @@ const userSchema = new mongoose.Schema(
       default: false,
     },
     seenTours: {
+      type: [String],
+      default: [],
+    },
+    grantedPermissions: {
       type: [String],
       default: [],
     },
