@@ -1,5 +1,28 @@
 const Role = require('../models/Role');
 
+const PERMISSION_ALIASES = {
+  'documents:view': 'documents:read',
+  'documents:upload': 'documents:write',
+  'documents:edit': 'documents:write',
+  'documents:delete': 'documents:write',
+  'notifications:view': 'notifications:read',
+  'notifications:create': 'notifications:write',
+  'users:view': 'users:read',
+  'users:edit': 'users:write',
+  'users:lock': 'users:write',
+};
+
+const expandPermissions = (permissions = []) => {
+  const expanded = new Set();
+  permissions.filter(Boolean).forEach((permission) => {
+    expanded.add(permission);
+    if (PERMISSION_ALIASES[permission]) {
+      expanded.add(PERMISSION_ALIASES[permission]);
+    }
+  });
+  return Array.from(expanded);
+};
+
 /**
  * Middleware kiểm tra quyền hạn động của người dùng (Permission-Based Authorization)
  * @param {string} requiredPermission - Mã quyền hạn yêu cầu (e.g. 'departments:write', 'audit:read')
@@ -33,9 +56,14 @@ const checkPermission = (requiredPermission) => {
         });
       }
 
-      // Admin có quyền wildcard '*' hoặc vai trò có chứa cụ thể quyền yêu cầu
-      const hasWildcard = role.permissions.includes('*');
-      const hasDirectPermission = role.permissions.includes(requiredPermission);
+      const effectivePermissions = expandPermissions([
+        ...(Array.isArray(role.permissions) ? role.permissions : []),
+        ...(Array.isArray(user.grantedPermissions) ? user.grantedPermissions : []),
+      ]);
+
+      // Admin có quyền wildcard '*' hoặc vai trò/user có chứa cụ thể quyền yêu cầu
+      const hasWildcard = effectivePermissions.includes('*');
+      const hasDirectPermission = effectivePermissions.includes(requiredPermission);
 
       if (hasWildcard || hasDirectPermission) {
         return next();

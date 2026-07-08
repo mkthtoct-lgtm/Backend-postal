@@ -24,13 +24,29 @@ const getUserGroupIds = (roleSlug) => {
   return groups;
 };
 
+const canUseDocumentAction = ({ roleSlug, rolePermissions = [], departmentId, document, action }) => {
+  if (roleSlug === 'admin') return true;
+  if (Array.isArray(rolePermissions) && (rolePermissions.includes('*') || rolePermissions.includes('documents:write'))) {
+    return true;
+  }
+
+  const rule = document.permissions?.[action] || { groups: [], roles: [], departments: [] };
+  const userGroups = getUserGroupIds(roleSlug);
+
+  return (
+    (Array.isArray(rule.groups) && rule.groups.some(group => userGroups.includes(group))) ||
+    (Array.isArray(rule.roles) && rule.roles.includes(roleSlug)) ||
+    Boolean(departmentId && Array.isArray(rule.departments) && rule.departments.includes(departmentId.toString()))
+  );
+};
+
 class DocumentService {
   /**
    * Lấy danh sách tài liệu có phân trang và lọc theo danh mục & phân quyền người dùng
-   * @param {Object} queryParams - page, limit, categoryId, roleSlug, departmentId
+   * @param {Object} queryParams - page, limit, categoryId, roleSlug, rolePermissions, departmentId, filterDepartmentId
    * @returns {Promise<Object>} Object chứa danh sách items và total
    */
-  async findAndCount({ page = 1, limit = 10, categoryId, roleSlug, departmentId }) {
+  async findAndCount({ page = 1, limit = 10, categoryId, roleSlug, rolePermissions = [], departmentId, filterDepartmentId }) {
     const filter = { deletedAt: null };
 
     // Lọc theo danh mục nếu được cung cấp
@@ -38,8 +54,16 @@ class DocumentService {
       filter.categoryId = categoryId;
     }
 
+    if (filterDepartmentId && filterDepartmentId !== 'all') {
+      filter.departmentId = filterDepartmentId;
+    }
+
     // Áp dụng phân quyền dòng (Row-level permissions)
-    if (roleSlug && roleSlug !== 'admin') {
+    const hasRoleReadPermission =
+      Array.isArray(rolePermissions) &&
+      (rolePermissions.includes('*') || rolePermissions.includes('documents:read'));
+
+    if (roleSlug && roleSlug !== 'admin' && !hasRoleReadPermission) {
       const userGroups = getUserGroupIds(roleSlug);
       const orConditions = [
         { 'permissions.view.groups': { $in: userGroups } },
@@ -69,6 +93,9 @@ class DocumentService {
 
     // Format dữ liệu để đảm bảo tương thích 100% với FE:
     // Gán đồng thời cả 'categoryId' dạng string và đối tượng 'category' đầy đủ.
+    const canUpload = Array.isArray(rolePermissions) &&
+      (rolePermissions.includes('*') || rolePermissions.includes('documents:write'));
+
     const itemsMapped = documents.map(doc => {
       const docObj = doc.toObject();
       if (docObj.categoryId) {
@@ -79,6 +106,24 @@ class DocumentService {
           docObj.categoryId = docObj.categoryId.toString();
         }
       }
+      const canEdit = canUseDocumentAction({
+        roleSlug,
+        rolePermissions,
+        departmentId,
+        document: docObj,
+        action: 'edit',
+      });
+
+      docObj.capabilities = {
+        canUpload,
+        canEdit,
+        canDelete: canEdit,
+        canDownload: true,
+      };
+      docObj.canEdit = canEdit;
+      docObj.canDelete = canEdit;
+      docObj.canUpload = canUpload;
+
       return docObj;
     });
 
@@ -88,6 +133,9 @@ class DocumentService {
       page,
       limit,
       pages: Math.ceil(total / limit),
+      capabilities: {
+        canUpload,
+      },
     };
   }
 

@@ -102,7 +102,9 @@ class DashboardController {
         });
       }
 
-      const dashboardData = await dashboardService.getDepartmentHeadDashboard(departmentId);
+      const dashboardData = await dashboardService.getDepartmentHeadDashboard(departmentId, {
+        includeHidden: isAdmin || departmentId === req.user.departmentId,
+      });
 
       return res.status(200).json({
         success: true,

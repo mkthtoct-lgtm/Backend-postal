@@ -124,10 +124,13 @@ class DashboardService {
   /**
    * Dashboard cho Trưởng bộ phận - Thông tin bộ phận chuyên môn của họ
    */
-  async getDepartmentHeadDashboard(departmentId) {
+  async getDepartmentHeadDashboard(departmentId, options = {}) {
     try {
       // Thông tin phòng ban
-      const department = await Department.findOne({ _id: departmentId, isHidden: false }).lean();
+      const departmentFilter = options.includeHidden
+        ? { _id: departmentId }
+        : { _id: departmentId, isHidden: false };
+      const department = await Department.findOne(departmentFilter).lean();
       if (!department) {
         throw new Error('Phòng ban không tồn tại hoặc đã bị ẩn.');
       }
@@ -422,7 +425,7 @@ class DashboardService {
             }
             departmentId = firstDepartment._id.toString();
           }
-          return await this.getDepartmentHeadDashboard(departmentId);
+          return await this.getDepartmentHeadDashboard(departmentId, { includeHidden: true });
         }
 
         if (['employee', 'nhansu'].includes(requestedType)) {
@@ -455,7 +458,7 @@ class DashboardService {
         if (!user.departmentId) {
           throw new Error('Trưởng bộ phận phải được gán vào một phòng ban.');
         }
-        return await this.getDepartmentHeadDashboard(user.departmentId);
+        return await this.getDepartmentHeadDashboard(user.departmentId, { includeHidden: true });
       }
 
       // Cộng tác viên (congtacvien) → Dashboard cộng tác viên

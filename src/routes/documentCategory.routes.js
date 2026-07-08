@@ -1,23 +1,11 @@
 const express = require('express');
 const documentCategoryController = require('../controllers/documentCategory.controller');
 const authMiddleware = require('../middlewares/auth');
+const checkPermission = require('../middlewares/checkPermission');
 
 const router = express.Router();
 
-// Middleware kiểm tra quyền Admin hoặc Ban Giám Đốc
-const adminOnlyMiddleware = (req, res, next) => {
-  const ADMIN_ROLE_ID = '69fc5af582ef85451120772a';
-  const BOARD_OF_DIRECTORS_ROLE_ID = '69fc5af582ef85451120772b';
-
-  if (req.user && (req.user.roleId === ADMIN_ROLE_ID || req.user.roleId === BOARD_OF_DIRECTORS_ROLE_ID)) {
-    next();
-  } else {
-    return res.status(403).json({
-      success: false,
-      message: 'Từ chối truy cập: Bạn không có quyền quản lý danh mục tài liệu.',
-    });
-  }
-};
+const canWriteDocuments = checkPermission('documents:write');
 
 /**
  * @swagger
@@ -107,7 +95,7 @@ router.get('/', authMiddleware, documentCategoryController.getAllCategories);
  *       401:
  *         description: Chưa đăng nhập
  */
-router.post('/', authMiddleware, adminOnlyMiddleware, documentCategoryController.createCategory);
+router.post('/', authMiddleware, canWriteDocuments, documentCategoryController.createCategory);
 
 /**
  * @swagger
@@ -147,7 +135,7 @@ router.post('/', authMiddleware, adminOnlyMiddleware, documentCategoryController
  *       401:
  *         description: Chưa đăng nhập
  */
-router.patch('/:id', authMiddleware, adminOnlyMiddleware, documentCategoryController.updateCategory);
+router.patch('/:id', authMiddleware, canWriteDocuments, documentCategoryController.updateCategory);
 
 /**
  * @swagger
@@ -174,6 +162,6 @@ router.patch('/:id', authMiddleware, adminOnlyMiddleware, documentCategoryContro
  *       401:
  *         description: Chưa đăng nhập
  */
-router.patch('/:id/toggle-visibility', authMiddleware, adminOnlyMiddleware, documentCategoryController.toggleVisibility);
+router.patch('/:id/toggle-visibility', authMiddleware, canWriteDocuments, documentCategoryController.toggleVisibility);
 
 module.exports = router;

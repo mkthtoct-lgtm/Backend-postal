@@ -11,7 +11,9 @@ class UserService {
     return await User.findOne({
       email: email.toLowerCase().trim(),
       deletedAt: null,
-    });
+    })
+      .populate('roleId')
+      .populate('departmentId');
   }
 
   /**
@@ -23,7 +25,10 @@ class UserService {
     return await User.findOne({
       _id: id,
       deletedAt: null,
-    }).populate('referred_by_user_id', 'fullName email referral_code');
+    })
+      .populate('referred_by_user_id', 'fullName email referral_code')
+      .populate('roleId')
+      .populate('departmentId');
   }
 
   /**
@@ -154,7 +159,11 @@ class UserService {
       referral_code,
     });
 
-    return await newUser.save();
+    const saved = await newUser.save();
+    return await User.findById(saved._id)
+      .populate('referred_by_user_id', 'fullName email referral_code')
+      .populate('roleId')
+      .populate('departmentId');
   }
 
   async update(userId, updateData) {
@@ -164,7 +173,7 @@ class UserService {
       { _id: userId, deletedAt: null },
       { $set: dataToUpdate },
       { returnDocument: 'after' }
-    ).select('-passwordHash');
+    ).select('-passwordHash').populate('roleId').populate('departmentId');
   }
 
   /**
