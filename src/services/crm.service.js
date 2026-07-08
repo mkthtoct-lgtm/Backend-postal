@@ -65,10 +65,19 @@ class CrmService {
 
       const description = `Trạng thái: ${statusText}${orderInfoText}. Dịch vụ quan tâm: ${lead.productInterest}. Quốc gia: ${lead.countryInterest}. Ngân sách: ${lead.budgetRange}. Mức độ cấp thiết: ${lead.urgency}. Kênh liên hệ: ${lead.preferredContact}. Ghi chú CTV: ${lead.note}. Người giới thiệu: ${collaboratorInfo}`;
 
+      let syncPhone = String(lead.phone || '').trim().replace(/[^0-9+]/g, '');
+      if (syncPhone.startsWith('+84')) {
+        syncPhone = '0' + syncPhone.slice(3);
+      } else if (syncPhone.startsWith('84') && syncPhone.length > 9) {
+        syncPhone = '0' + syncPhone.slice(2);
+      } else if (/^[1-9][0-9]{8}$/.test(syncPhone)) {
+        syncPhone = '0' + syncPhone;
+      }
+
       const payload = {
         name: lead.customerName,
         fullname: lead.customerName,
-        phone: lead.phone,
+        phone: syncPhone,
         email: lead.email,
         source: lead.source,
         note: lead.note,
@@ -103,6 +112,10 @@ class CrmService {
         commissionAmount: commissionDetails ? commissionDetails.commissionAmount : 0,
         commissionStatus: commissionDetails ? commissionDetails.status : null
       };
+
+      if (lead.bizflyContactId) {
+        payload.ma_khach_hang = lead.bizflyContactId;
+      }
 
       console.log(`[Bizfly CRM] Bắt đầu đẩy lead lên BizFly...`, payload);
 
