@@ -113,10 +113,6 @@ class CrmService {
         commissionStatus: commissionDetails ? commissionDetails.status : null
       };
 
-      if (lead.bizflyContactId) {
-        payload.ma_khach_hang = lead.bizflyContactId;
-      }
-
       console.log(`[Bizfly CRM] Bắt đầu đẩy lead lên BizFly...`, payload);
 
       const response = await fetch(webhookUrl, {
