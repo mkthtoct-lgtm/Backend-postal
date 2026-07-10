@@ -164,6 +164,48 @@ class GoogleDriveService {
   }
 
   /**
+   * Tìm thư mục theo tên và thư mục cha trên Google Drive
+   * @param {string} name - Tên thư mục cần tìm
+   * @param {string} [parentFolderId] - ID thư mục cha
+   * @returns {Promise<string|null>} Trả về folderId nếu tìm thấy, ngược lại trả về null
+   */
+  async findFolder(name, parentFolderId = null) {
+    try {
+      if (!drive) {
+        throw new Error('Google Drive API client chưa được khởi tạo thành công.');
+      }
+
+      const targetParent = parentFolderId || FOLDER_ID;
+      // Tránh lỗi cú pháp query bằng cách escape dấu nháy đơn
+      const escapedName = name.replace(/'/g, "\\'");
+
+      const response = await drive.files.list({
+        q: `name = '${escapedName}' and mimeType = 'application/vnd.google-apps.folder' and '${targetParent}' in parents and trashed = false`,
+        fields: 'files(id)',
+        spaces: 'drive',
+        pageSize: 1
+      });
+
+      const files = response.data.files || [];
+      return files.length > 0 ? files[0].id : null;
+    } catch (error) {
+      console.error(`Lỗi hệ thống khi tìm thư mục '${name}' trên Google Drive:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Lấy thư mục theo tên hoặc tạo mới nếu chưa tồn tại
+   */
+  async getOrCreateFolder(folderName, parentFolderId = null) {
+    const existingId = await this.findFolder(folderName, parentFolderId);
+    if (existingId) {
+      return existingId;
+    }
+    return await this.createFolder(folderName, parentFolderId);
+  }
+
+  /**
    * Đổi tên thư mục trên Google Drive
    */
   async renameFolder(folderId, newFolderName) {

@@ -87,9 +87,12 @@ class LeadController {
       let finalNote = note ? note.trim() : '';
 
       try {
+        // Lấy hoặc tạo thư mục mẹ "CCCD Khách hàng" trong thư mục gốc Google Drive
+        const parentCccdFolderId = await googleDriveService.getOrCreateFolder('CCCD Khách hàng');
+
         const folderName = `${customerName.trim()} - ${phone.trim()}`;
-        // Tạo thư mục mang tên khách hàng trên Google Drive
-        cccdFolderId = await googleDriveService.createFolder(folderName);
+        // Tạo thư mục mang tên khách hàng bên trong thư mục "CCCD Khách hàng"
+        cccdFolderId = await googleDriveService.createFolder(folderName, parentCccdFolderId);
         
         // Tải file ảnh CCCD mặt trước vào thư mục vừa tạo
         const frontUpload = {
