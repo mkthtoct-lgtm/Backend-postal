@@ -352,7 +352,7 @@ class AuthController {
         });
       }
 
-      const result = await authService.forgotPassword({ email });
+      const result = await authService.forgotPassword({ email }, req.headers.origin);
 
       return res.status(200).json({
         success: true,
@@ -451,7 +451,8 @@ class AuthController {
 
       const env = require('../configs/env');
       const referralCode = user.referral_code || '';
-      const referralUrl = `${env.FRONTEND_URL}/register?ref=${referralCode}`;
+      const origin = req.headers.origin || env.FRONTEND_URL;
+      const referralUrl = `${origin}/register?ref=${referralCode}`;
 
       return res.status(200).json({
         success: true,

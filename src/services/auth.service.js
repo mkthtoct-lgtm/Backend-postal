@@ -197,7 +197,7 @@ class AuthService {
   /**
    * Xử lý yêu cầu Quên mật khẩu (Forgot Password)
    */
-  async forgotPassword(forgotPasswordDto) {
+  async forgotPassword(forgotPasswordDto, origin) {
     const { email } = forgotPasswordDto;
     const user = await userService.findByEmail(email);
 
@@ -224,7 +224,8 @@ class AuthService {
     await resetTokenDoc.save();
 
     // Gửi email khôi phục kèm đường link
-    const resetLink = `${env.FRONTEND_URL}/reset-password?token=${token}`;
+    const frontendUrl = origin || env.FRONTEND_URL;
+    const resetLink = `${frontendUrl}/reset-password?token=${token}`;
     await mailService.sendPasswordResetEmail(user.email, resetLink);
 
     return PASSWORD_RESET_RESPONSE;
