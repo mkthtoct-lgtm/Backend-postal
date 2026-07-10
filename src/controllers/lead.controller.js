@@ -25,7 +25,8 @@ class LeadController {
         preferredContact,
         note,
         status,
-        productId // Bổ sung để hỗ trợ định danh sản phẩm chi tiết
+        productId, // Bổ sung để hỗ trợ định danh sản phẩm chi tiết
+        referralCode
       } = req.body;
 
       if (!customerName || !phone) {
@@ -58,6 +59,20 @@ class LeadController {
           }
         } catch (err) {
           console.warn('[LeadController] Token không hợp lệ hoặc đã hết hạn:', err.message);
+        }
+      }
+
+      // Nếu không có token xác thực (ví dụ khách đăng ký trực tiếp qua link giới thiệu),
+      // tìm collaboratorId dựa trên referralCode gửi lên từ body
+      if (!collaboratorId && referralCode && referralCode.trim()) {
+        try {
+          const User = require('../models/User');
+          const referrer = await User.findOne({ referral_code: referralCode.trim(), deletedAt: null }).lean();
+          if (referrer) {
+            collaboratorId = referrer._id;
+          }
+        } catch (dbErr) {
+          console.error('[LeadController] Lỗi khi truy vấn người giới thiệu qua referralCode:', dbErr.message);
         }
       }
 
