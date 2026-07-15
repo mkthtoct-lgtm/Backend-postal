@@ -21,6 +21,7 @@ const sopRoutes = require('./routes/sop.routes');
 const checklistRoutes = require('./routes/checklist.routes');
 const aiConfigRoutes = require('./routes/aiConfig.routes');
 const roleRoutes = require('./routes/role.routes');
+const schoolRoutes = require('./routes/school.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 const env = require('./configs/env');
 const responseNormalizer = require('./middlewares/responseNormalizer');
@@ -102,6 +103,7 @@ app.use('/api/v1/sops', sopRoutes);
 app.use('/api/v1/checklists', checklistRoutes);
 app.use('/api/v1/ai', aiConfigRoutes);
 app.use('/api/v1/roles', roleRoutes);
+app.use('/api/v1/schools', schoolRoutes);
 
 app.get('/', (req, res) => {
   res.json({
