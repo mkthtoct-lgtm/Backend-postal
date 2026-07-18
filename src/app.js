@@ -22,6 +22,7 @@ const checklistRoutes = require('./routes/checklist.routes');
 const aiConfigRoutes = require('./routes/aiConfig.routes');
 const roleRoutes = require('./routes/role.routes');
 const schoolRoutes = require('./routes/school.routes');
+const surveyRoutes = require('./routes/survey.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 const env = require('./configs/env');
 const responseNormalizer = require('./middlewares/responseNormalizer');
@@ -104,6 +105,8 @@ app.use('/api/v1/checklists', checklistRoutes);
 app.use('/api/v1/ai', aiConfigRoutes);
 app.use('/api/v1/roles', roleRoutes);
 app.use('/api/v1/schools', schoolRoutes);
+// Khai báo định tuyến cho hệ thống Khảo sát (Surveys)
+app.use('/api/v1/surveys', surveyRoutes);
 
 app.get('/', (req, res) => {
   res.json({

@@ -1,21 +1,7 @@
-const SPREADSHEET_ID = '1iq_3AFmBgqGXiB3jVZWvcU_hATXeNwIe17TAT7-f7a8';
-const DEFAULT_GID = '1174598013';
+const School = require('../models/School');
+const SchoolSource = require('../models/SchoolSource');
 
-const PROGRAM_GIDS = {
-  daihoc: '1174598013',    // Hệ Đại học
-  thpt: '687334184'        // Hệ THPT
-};
-
-// In-memory cache object keyed by GID
-const cache = {}; // { [gid]: { data, expiry } }
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-let tabCache = null;
-let tabCacheExpiry = 0;
-
-/**
- * Robust CSV parser handling quotes and newlines in cell values (RFC 4180 style)
- */
+// ──── CSV PARSER (RFC 4180) ─────────────────────────────────────────────────
 function parseCSV(text) {
   const lines = [];
   let row = [''];
@@ -35,173 +21,278 @@ function parseCSV(text) {
     } else if (c === ',' && !inQuotes) {
       row.push('');
     } else if ((c === '\r' || c === '\n') && !inQuotes) {
-      if (c === '\r' && next === '\n') {
-        i++;
-      }
+      if (c === '\r' && next === '\n') i++;
       lines.push(row);
       row = [''];
     } else {
       row[row.length - 1] += c;
     }
   }
-  if (row.length > 1 || row[0] !== '') {
-    lines.push(row);
-  }
+  if (row.length > 1 || row[0] !== '') lines.push(row);
   return lines;
 }
 
+// ──── HEADER → MODEL FIELD MAPPING ──────────────────────────────────────────
+const HEADER_FIELD_MAP = {
+  'STT': 'stt',
+  'Tên trường': 'name',
+  'Khu vực': 'region',
+  'Địa chỉ': 'address',
+  'Chuyên ngành': 'majors',
+  'Website': 'website',
+  'Hệ tuyển sinh': 'admissionSystem',
+  'Hạn báo danh': 'deadlineRegister',
+  'Hạn nộp hồ sơ': 'deadlineDocument',
+  'Điều kiện tuyển sinh': 'requirements',
+  'Học phí học tiếng (1+4) TWD': 'tuitionLanguage',
+  'Học phí chuyên ngành (TWD)': 'tuitionMajor',
+  'Ký túc xá (đài tệ)': 'dormitory',
+  'Học bổng': 'scholarship',
+  'File ảnh thông báo': 'imageUrl',
+};
+
+function mapHeaderToField(header) {
+  const trimmed = header.trim();
+  // Exact match first
+  if (HEADER_FIELD_MAP[trimmed]) return HEADER_FIELD_MAP[trimmed];
+  // Case-insensitive / partial match
+  const lower = trimmed.toLowerCase();
+  if (lower.includes('tên trường') || lower.includes('ten truong')) return 'name';
+  if (lower.includes('khu vực') || lower.includes('khu vuc')) return 'region';
+  if (lower.includes('địa chỉ') || lower.includes('dia chi')) return 'address';
+  if (lower.includes('chuyên ngành') || lower.includes('chuyen nganh')) return 'majors';
+  if (lower.includes('website')) return 'website';
+  if (lower.includes('hệ tuyển') || lower.includes('he tuyen')) return 'admissionSystem';
+  if (lower.includes('hạn báo') || lower.includes('han bao')) return 'deadlineRegister';
+  if (lower.includes('hạn nộp') || lower.includes('han nop')) return 'deadlineDocument';
+  if (lower.includes('điều kiện') || lower.includes('dieu kien')) return 'requirements';
+  if (lower.includes('học phí') && lower.includes('tiếng')) return 'tuitionLanguage';
+  if (lower.includes('học phí') && lower.includes('chuyên')) return 'tuitionMajor';
+  if (lower.includes('ký túc') || lower.includes('ky tuc')) return 'dormitory';
+  if (lower.includes('học bổng') || lower.includes('hoc bong')) return 'scholarship';
+  if (lower.includes('ảnh') || lower.includes('image') || lower.includes('file')) return 'imageUrl';
+  if (lower === 'stt' || lower === 'no' || lower === '#') return 'stt';
+  return null; // unmapped → goes to extraFields
+}
+
+
 class SchoolService {
-  /**
-   * Parse sheet tabs and GIDs dynamically from the Google Sheets edit page
-   */
-  async getSpreadsheetTabs() {
-    const now = Date.now();
-    if (tabCache && now < tabCacheExpiry) {
-      return tabCache;
+  // ──── SOURCES CRUD ──────────────────────────────────────────────────────────
+  async findAllSources() {
+    return SchoolSource.find().sort({ country: 1, program: 1 }).lean();
+  }
+
+  async createSource(data) {
+    const source = new SchoolSource({
+      name: data.name,
+      country: data.country,
+      program: data.program,
+      spreadsheetId: data.spreadsheetId,
+      gid: data.gid,
+      isActive: data.isActive !== false,
+    });
+    return source.save();
+  }
+
+  async updateSource(id, data) {
+    return SchoolSource.findByIdAndUpdate(id, { $set: data }, { new: true, lean: true });
+  }
+
+  async deleteSource(id) {
+    // Also remove all schools synced from this source
+    await School.deleteMany({ sourceId: id });
+    return SchoolSource.findByIdAndDelete(id);
+  }
+
+  // ──── SYNC FROM GOOGLE SHEET ──────────────────────────────────────────────
+  async syncFromSheet(sourceId) {
+    const source = await SchoolSource.findById(sourceId);
+    if (!source) throw new Error('Không tìm thấy nguồn đồng bộ.');
+
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${source.spreadsheetId}/export?format=csv&gid=${source.gid}`;
+    console.log(`[SchoolService] Syncing from Sheet: ${csvUrl}`);
+
+    const response = await fetch(csvUrl);
+    if (!response.ok) throw new Error(`Google Sheets fetch failed: ${response.status}`);
+
+    const text = await response.text();
+    const parsedLines = parseCSV(text);
+    if (parsedLines.length === 0) throw new Error('CSV data is empty.');
+
+    const headers = parsedLines[0].map(h => h.trim()).filter(Boolean);
+    const headerMapping = headers.map(h => ({ original: h, field: mapHeaderToField(h) }));
+
+    const schools = [];
+    for (let i = 1; i < parsedLines.length; i++) {
+      const row = parsedLines[i];
+      if (row.length < 2 || !row[1] || !row[1].trim()) continue;
+
+      const doc = {
+        country: source.country,
+        program: source.program,
+        sourceId: source._id,
+        extraFields: {},
+      };
+
+      headerMapping.forEach((mapping, idx) => {
+        const val = row[idx] ? row[idx].trim() : '';
+        if (mapping.field) {
+          if (mapping.field === 'stt') {
+            doc.stt = parseInt(val) || 0;
+          } else {
+            doc[mapping.field] = val;
+          }
+        } else if (mapping.original) {
+          doc.extraFields[mapping.original] = val;
+        }
+      });
+
+      // Must have a name
+      if (!doc.name) continue;
+      schools.push(doc);
     }
 
-    try {
-      console.log(`[SchoolService] Fetching Google Sheet tabs dynamically...`);
-      const response = await fetch(`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`);
-      if (!response.ok) {
-        throw new Error(`Google Sheets edit page fetch failed: ${response.status}`);
-      }
-      const html = await response.text();
-      const regex = /\[\d+,0,\\"(\d+)\\",\[\{\\"1\\":\[\[0,0,\\"([^\\"]+)\\"/g;
-      let match;
-      const tabs = [];
-      while ((match = regex.exec(html)) !== null) {
-        const gid = match[1];
-        const name = match[2].trim();
-        // Skip default sheet names (e.g. Sheet1, Sheet9) and templates
-        if (/^Sheet\d+$/i.test(name) || name.toLowerCase().includes('template') || !name) {
-          continue;
-        }
-        tabs.push({ id: gid, name });
-      }
+    // Remove old records from this source, then bulk insert new
+    await School.deleteMany({ sourceId: source._id });
+    if (schools.length > 0) {
+      await School.insertMany(schools);
+    }
 
-      // Fallback if no tabs parsed (ensure we always have at least Đại học and THPT)
-      if (tabs.length === 0) {
-        tabs.push(
-          { id: '1174598013', name: 'ĐẠI HỌC' },
-          { id: '687334184', name: 'THPT ' }
-        );
-      }
+    // Update source metadata
+    source.lastSyncedAt = new Date();
+    source.lastSyncCount = schools.length;
+    await source.save();
 
-      tabCache = tabs;
-      tabCacheExpiry = now + 15 * 60 * 1000; // 15 minutes cache
-      console.log(`[SchoolService] Successfully parsed ${tabs.length} tabs dynamically.`);
-      return tabs;
-    } catch (error) {
-      console.error('[SchoolService] Error fetching sheet tabs:', error);
-      if (tabCache) return tabCache;
-      return [
-        { id: '1174598013', name: 'ĐẠI HỌC' },
-        { id: '687334184', name: 'THPT ' }
+    console.log(`[SchoolService] Synced ${schools.length} schools from source ${source.name}`);
+    return { count: schools.length, headers };
+  }
+
+  // ──── SCHOOLS CRUD ────────────────────────────────────────────────────────
+  async findSchools({ search, region, admissionSystem, country, program, page = 1, limit = 100 } = {}) {
+    const query = { isActive: true };
+
+    if (country && country !== 'all') query.country = country;
+    if (program && program !== 'all') query.program = program;
+
+    if (region && region !== 'all') {
+      query.region = { $regex: region, $options: 'i' };
+    }
+    if (admissionSystem && admissionSystem !== 'all') {
+      query.admissionSystem = { $regex: admissionSystem, $options: 'i' };
+    }
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { majors: { $regex: search, $options: 'i' } },
+        { requirements: { $regex: search, $options: 'i' } },
+        { address: { $regex: search, $options: 'i' } },
+        { region: { $regex: search, $options: 'i' } },
       ];
     }
-  }
 
-  /**
-   * Fetch and parse the Google Sheet tab. Utilizes in-memory caching.
-   */
-  async getSchoolDirectory(gid = DEFAULT_GID) {
-    const now = Date.now();
-    if (cache[gid] && now < cache[gid].expiry) {
-      return cache[gid].data;
+    const total = await School.countDocuments(query);
+    const records = await School.find(query)
+      .sort({ stt: 1, name: 1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    // Build dynamic headers from all non-empty fields
+    const DISPLAY_HEADERS = [
+      'STT', 'Tên trường', 'Khu vực', 'Địa chỉ', 'Chuyên ngành', 'Website',
+      'Hệ tuyển sinh', 'Hạn báo danh', 'Hạn nộp hồ sơ', 'Điều kiện tuyển sinh',
+      'Học phí học tiếng (1+4) TWD', 'Học phí chuyên ngành (TWD)', 'Ký túc xá (đài tệ)',
+      'Học bổng', 'File ảnh thông báo',
+    ];
+
+    // Convert DB records to row objects matching the old header-based format
+    const FIELD_HEADER_MAP = {};
+    for (const [header, field] of Object.entries(HEADER_FIELD_MAP)) {
+      FIELD_HEADER_MAP[field] = header;
     }
 
-    try {
-      console.log(`[SchoolService] Fetching Google Sheet CSV from source for gid=${gid}...`);
-      const sheetCsvUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=${gid}`;
-      const response = await fetch(sheetCsvUrl);
-      if (!response.ok) {
-        throw new Error(`Google Sheets fetch failed with status: ${response.status}`);
-      }
-
-      const text = await response.text();
-      const parsedLines = parseCSV(text);
-
-      if (parsedLines.length === 0) {
-        throw new Error('Parsed CSV data is empty.');
-      }
-
-      // First line is headers - trim them to clean key names
-      const headers = parsedLines[0].map(h => h.trim()).filter(Boolean);
-      const records = [];
-
-      for (let i = 1; i < parsedLines.length; i++) {
-        const row = parsedLines[i];
-        // Skip empty rows or rows that do not have a school name
-        if (row.length < 2 || !row[1] || !row[1].trim()) continue;
-
-        const record = {};
-        // Map all headers dynamically to their corresponding indices
-        headers.forEach((header, index) => {
-          record[header] = row[index] ? row[index].trim() : '';
+    const rowRecords = records.map(r => {
+      const row = {};
+      DISPLAY_HEADERS.forEach(h => {
+        const field = HEADER_FIELD_MAP[h];
+        if (field && r[field] !== undefined) {
+          row[h] = field === 'stt' ? String(r[field]) : r[field];
+        }
+      });
+      // Merge extra fields
+      if (r.extraFields) {
+        Object.entries(r.extraFields).forEach(([k, v]) => {
+          if (v) row[k] = v;
         });
-        records.push(record);
       }
+      // Attach _id for edit/delete operations
+      row._id = r._id;
+      return row;
+    });
 
-      const result = { headers, records };
-      cache[gid] = {
-        data: result,
-        expiry: now + CACHE_TTL_MS
-      };
-      console.log(`[SchoolService] Fetched and parsed ${records.length} schools successfully for gid=${gid}. Cache updated.`);
-      return result;
-    } catch (error) {
-      console.error(`[SchoolService] Error fetching school directory for gid=${gid}:`, error);
-      // If fetch fails but we have stale cache, return it as a fallback
-      if (cache[gid]) {
-        console.warn(`[SchoolService] Returning stale cached data as fallback for gid=${gid}.`);
-        return cache[gid].data;
-      }
-      throw error;
-    }
+    // Collect all unique headers present across all records
+    const extraHeaderSet = new Set();
+    records.forEach(r => {
+      if (r.extraFields) Object.keys(r.extraFields).forEach(k => extraHeaderSet.add(k));
+    });
+    const headers = [...DISPLAY_HEADERS, ...Array.from(extraHeaderSet)];
+
+    return { headers, records: rowRecords, total };
   }
 
-  /**
-   * Query schools with search filters and program mapping
-   */
-  async findSchools({ search = '', region = '', admissionSystem = '', program = '' } = {}) {
-    const gid = PROGRAM_GIDS[program] || program || DEFAULT_GID;
-    const directory = await this.getSchoolDirectory(gid);
-    let filteredRecords = [...directory.records];
+  async createSchool(data) {
+    const school = new School(data);
+    return school.save();
+  }
 
-    // Filter by Region (Khu vực)
-    if (region && region !== 'all') {
-      const cleanRegion = region.toLowerCase().trim();
-      filteredRecords = filteredRecords.filter(record => {
-        const recordRegion = String(record['Khu vực'] || record['Khu vực '] || '').toLowerCase();
-        return recordRegion.includes(cleanRegion);
-      });
+  async updateSchool(id, data) {
+    return School.findByIdAndUpdate(id, { $set: data }, { new: true, lean: true });
+  }
+
+  async deleteSchool(id) {
+    return School.findByIdAndDelete(id);
+  }
+
+  // ──── FILTER OPTIONS (dynamic) ────────────────────────────────────────────
+  async getCountries() {
+    return School.distinct('country', { isActive: true });
+  }
+
+  async getPrograms(country) {
+    const query = { isActive: true };
+    if (country && country !== 'all') query.country = country;
+    return School.distinct('program', query);
+  }
+
+  async getRegions(country, program) {
+    const query = { isActive: true };
+    if (country && country !== 'all') query.country = country;
+    if (program && program !== 'all') query.program = program;
+    const regions = await School.distinct('region', query);
+    return regions.filter(Boolean).sort();
+  }
+
+  async getSystems(country, program) {
+    const query = { isActive: true };
+    if (country && country !== 'all') query.country = country;
+    if (program && program !== 'all') query.program = program;
+    const systems = await School.distinct('admissionSystem', query);
+    return systems.filter(Boolean).sort();
+  }
+
+  // ──── LEGACY: Backward compatible with old Google Sheet direct fetch ──────
+  // Keep getSpreadsheetTabs for backward compatibility during transition
+  async getSpreadsheetTabs() {
+    // Return sources as "tabs"
+    const sources = await SchoolSource.find({ isActive: true }).lean();
+    if (sources.length > 0) {
+      return sources.map(s => ({ id: s._id.toString(), name: `${s.country} - ${s.program}` }));
     }
-
-    // Filter by Admission System (Hệ tuyển sinh)
-    if (admissionSystem && admissionSystem !== 'all') {
-      const cleanSystem = admissionSystem.toLowerCase().trim();
-      filteredRecords = filteredRecords.filter(record => {
-        const recordSystem = String(record['Hệ tuyển sinh'] || record['Hệ tuyển sinh '] || '').toLowerCase();
-        return recordSystem.includes(cleanSystem);
-      });
-    }
-
-    // Filter by Search text (searches name, majors, or requirements)
-    if (search) {
-      const cleanSearch = search.toLowerCase().trim();
-      filteredRecords = filteredRecords.filter(record => {
-        // Search across all fields dynamically in the record
-        return Object.values(record).some(val => 
-          String(val).toLowerCase().includes(cleanSearch)
-        );
-      });
-    }
-
-    return {
-      headers: directory.headers,
-      records: filteredRecords
-    };
+    // Fallback to hardcoded
+    return [
+      { id: '1174598013', name: 'ĐẠI HỌC' },
+      { id: '687334184', name: 'THPT' },
+    ];
   }
 }
 
