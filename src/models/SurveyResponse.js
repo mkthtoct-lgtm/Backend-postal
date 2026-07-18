@@ -32,6 +32,8 @@ const surveyResponseSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    collaboratorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    collaboratorName: { type: String, default: '', trim: true },
     answers: {
       type: mongoose.Schema.Types.Mixed,
       default: {},
