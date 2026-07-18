@@ -6,6 +6,7 @@ const router = express.Router();
 
 // Public endpoint — nhận phản hồi khảo sát từ Zalo Mini App / form bên ngoài
 router.post('/submit', surveyController.submitResponse);
+router.get('/public/:id', surveyController.getPublicById);
 
 // Authenticated endpoints
 router.get('/responses', authMiddleware, surveyController.getResponses);

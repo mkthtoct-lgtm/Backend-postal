@@ -1,5 +1,6 @@
 const Survey = require('../models/Survey');
 const SurveyResponse = require('../models/SurveyResponse');
+const User = require('../models/User');
 
 class SurveyService {
   /**
@@ -26,7 +27,10 @@ class SurveyService {
   async create(data) {
     const survey = new Survey({
       title: data.title,
+      kind: data.kind || (data.baseUrl ? 'external' : 'internal'),
       baseUrl: data.baseUrl,
+      description: data.description || '',
+      questions: Array.isArray(data.questions) ? data.questions : [],
       googleSheetWebhookUrl: data.googleSheetWebhookUrl || '',
       status: data.status || 'active',
     });
@@ -39,7 +43,10 @@ class SurveyService {
   async update(id, data) {
     const update = {};
     if (data.title !== undefined) update.title = data.title;
+    if (data.kind !== undefined) update.kind = data.kind;
     if (data.baseUrl !== undefined) update.baseUrl = data.baseUrl;
+    if (data.description !== undefined) update.description = data.description;
+    if (data.questions !== undefined) update.questions = Array.isArray(data.questions) ? data.questions : [];
     if (data.googleSheetWebhookUrl !== undefined) update.googleSheetWebhookUrl = data.googleSheetWebhookUrl;
     if (data.status !== undefined) update.status = data.status;
 
@@ -69,9 +76,15 @@ class SurveyService {
     let survey = null;
     if (data.surveyId) {
       survey = await Survey.findById(data.surveyId).lean();
+      if (!survey || survey.status !== 'active' || survey.deletedAt) {
+        throw new Error('Khảo sát không tồn tại hoặc đã tạm dừng.');
+      }
     }
 
     // Lưu vào MongoDB
+    const collaborator = data.ctvCode
+      ? await User.findOne({ referral_code: data.ctvCode.trim(), deletedAt: null }).select('_id fullName').lean()
+      : null;
     const response = new SurveyResponse({
       surveyId: data.surveyId || null,
       surveyTitle: data.surveyTitle || survey?.title || '',
@@ -79,13 +92,15 @@ class SurveyService {
       phone: data.phone,
       email: data.email || '',
       ctvCode: data.ctvCode || '',
+      collaboratorId: collaborator?._id || null,
+      collaboratorName: collaborator?.fullName || '',
       answers: data.answers || {},
       submittedAt: data.submittedAt || new Date(),
     });
     await response.save();
 
     // Đẩy lên Google Sheet nếu có cấu hình webhook
-    const webhookUrl = data.googleSheetWebhookUrl || survey?.googleSheetWebhookUrl;
+    const webhookUrl = survey?.googleSheetWebhookUrl;
     if (webhookUrl) {
       try {
         const payload = {

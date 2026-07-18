@@ -25,14 +25,27 @@ class SurveyController {
     }
   }
 
+  async getPublicById(req, res) {
+    try {
+      const survey = await surveyService.findById(req.params.id);
+      if (!survey || survey.status !== 'active') return res.status(404).json({ success: false, message: 'Khảo sát không tồn tại hoặc đã tạm dừng.' });
+      return res.json({ success: true, data: survey });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Lỗi máy chủ.' });
+    }
+  }
+
   /** POST /api/surveys */
   async create(req, res) {
     try {
-      const { title, baseUrl, googleSheetWebhookUrl, status } = req.body;
-      if (!title || !baseUrl) {
-        return res.status(400).json({ success: false, message: 'Vui lòng nhập tên và link khảo sát.' });
+      const { title, kind, baseUrl, description, questions, googleSheetWebhookUrl, status } = req.body;
+      if (!title) {
+        return res.status(400).json({ success: false, message: 'Vui lòng nhập tên khảo sát.' });
       }
-      const survey = await surveyService.create({ title, baseUrl, googleSheetWebhookUrl, status });
+      if (kind === 'external' && (!baseUrl || !/^https?:\/\//i.test(baseUrl))) {
+        return res.status(400).json({ success: false, message: 'Vui lòng nhập link khảo sát bên ngoài hợp lệ.' });
+      }
+      const survey = await surveyService.create({ title, kind, baseUrl, description, questions, googleSheetWebhookUrl, status });
       return res.status(201).json({ success: true, data: survey });
     } catch (error) {
       console.error('Error creating survey:', error);
@@ -67,12 +80,12 @@ class SurveyController {
   /** POST /api/surveys/submit — Public endpoint nhận phản hồi khảo sát */
   async submitResponse(req, res) {
     try {
-      const { surveyId, surveyTitle, customerName, phone, email, ctvCode, answers, googleSheetWebhookUrl } = req.body;
+      const { surveyId, surveyTitle, customerName, phone, email, ctvCode, answers } = req.body;
       if (!customerName || !phone) {
         return res.status(400).json({ success: false, message: 'Vui lòng nhập họ tên và số điện thoại.' });
       }
       const response = await surveyService.submitResponse({
-        surveyId, surveyTitle, customerName, phone, email, ctvCode, answers, googleSheetWebhookUrl,
+        surveyId, surveyTitle, customerName, phone, email, ctvCode, answers,
       });
       return res.status(201).json({ success: true, data: response });
     } catch (error) {
