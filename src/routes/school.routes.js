@@ -4,72 +4,26 @@ const authMiddleware = require('../middlewares/auth');
 
 const router = express.Router();
 
-/**
- * @swagger
- * tags:
- *   name: Schools
- *   description: Các API tra cứu thông tin trường học du học (đồng bộ từ Google Sheets)
- */
+// ──── Filter options (public, authenticated) ────────────────────────────────
+router.get('/countries', authMiddleware, schoolController.getCountries);
+router.get('/programs', authMiddleware, schoolController.getPrograms);
+router.get('/regions', authMiddleware, schoolController.getRegions);
+router.get('/systems', authMiddleware, schoolController.getSystems);
 
-/**
- * @swagger
- * /schools:
- *   get:
- *     summary: Lấy danh sách trường học du học đồng bộ trực tiếp từ Google Sheet
- *     tags: [Schools]
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *         description: Tìm kiếm nhanh theo tên trường, chuyên ngành, điều kiện...
- *       - in: query
- *         name: region
- *         schema:
- *           type: string
- *         description: Lọc theo Khu vực (Đài Bắc, Đài Trung, Đài Nam, Cao Hùng...)
- *       - in: query
- *         name: admissionSystem
- *         schema:
- *           type: string
- *         description: Lọc theo Hệ tuyển sinh (1+4, VHVL...)
- *     responses:
- *       200:
- *         description: Lấy danh sách trường học thành công
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: Lấy danh sách trường du học thành công.
- *                 data:
- *                   type: object
- *                   properties:
- *                     headers:
- *                       type: array
- *                       items:
- *                         type: string
- *                         example: "Tên trường"
- *                     records:
- *                       type: array
- *                       items:
- *                         type: object
- *                     total:
- *                       type: integer
- *                       example: 54
- *       401:
- *         description: Chưa đăng nhập hoặc token hết hạn
- *       500:
- *         description: Lỗi máy chủ
- */
+// ──── Sources management (Admin) ────────────────────────────────────────────
+router.get('/sources', authMiddleware, schoolController.getSources);
+router.post('/sources', authMiddleware, schoolController.createSource);
+router.put('/sources/:id', authMiddleware, schoolController.updateSource);
+router.delete('/sources/:id', authMiddleware, schoolController.deleteSource);
+router.post('/sources/:id/sync', authMiddleware, schoolController.syncSource);
+
+// ──── Tabs (backward compatible) ────────────────────────────────────────────
 router.get('/tabs', authMiddleware, schoolController.getSpreadsheetTabs);
+
+// ──── Schools CRUD ──────────────────────────────────────────────────────────
 router.get('/', authMiddleware, schoolController.getAllSchools);
+router.post('/', authMiddleware, schoolController.createSchool);
+router.put('/:id', authMiddleware, schoolController.updateSchool);
+router.delete('/:id', authMiddleware, schoolController.deleteSchool);
 
 module.exports = router;
