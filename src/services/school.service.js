@@ -109,21 +109,49 @@ class SchoolService {
     const source = await SchoolSource.findById(sourceId);
     if (!source) throw new Error('Không tìm thấy nguồn đồng bộ.');
 
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${source.spreadsheetId}/export?format=csv&gid=${source.gid}`;
-    console.log(`[SchoolService] Syncing from Sheet: ${csvUrl}`);
+    let spreadsheetId = String(source.spreadsheetId || '').trim();
+    let gid = source.gid ? String(source.gid).trim() : '0';
 
-    const response = await fetch(csvUrl);
-    if (!response.ok) {
-      const error = new Error(
-        response.status === 401 || response.status === 403
-          ? 'Google Sheet chưa cấp quyền xem. Hãy đặt quyền "Bất kỳ ai có đường liên kết - Người xem" rồi thử lại.'
-          : `Không thể tải dữ liệu Google Sheet (HTTP ${response.status}).`
-      );
-      error.statusCode = response.status === 401 || response.status === 403 ? 400 : 502;
+    if (spreadsheetId.includes('/d/')) {
+      const matchId = spreadsheetId.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (matchId) spreadsheetId = matchId[1];
+    }
+    if (source.spreadsheetId && source.spreadsheetId.includes('gid=')) {
+      const matchGid = source.spreadsheetId.match(/gid=([0-9]+)/);
+      if (matchGid) gid = matchGid[1];
+    }
+
+    const browserHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,text/csv,*/*;q=0.8'
+    };
+
+    const primaryUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${gid}`;
+    const fallbackUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&gid=${gid}`;
+
+    console.log(`[SchoolService] Syncing from Sheet: ${primaryUrl}`);
+
+    let response = await fetch(primaryUrl, { headers: browserHeaders });
+    let text = response.ok ? await response.text() : '';
+
+    if (!response.ok || text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
+      console.log(`[SchoolService] Primary export failed, trying fallback gviz endpoint: ${fallbackUrl}`);
+      const fallbackResponse = await fetch(fallbackUrl, { headers: browserHeaders });
+      if (fallbackResponse.ok) {
+        const fallbackText = await fallbackResponse.text();
+        if (!fallbackText.trim().startsWith('<!DOCTYPE html') && !fallbackText.trim().startsWith('<html')) {
+          response = fallbackResponse;
+          text = fallbackText;
+        }
+      }
+    }
+
+    if (!response.ok || text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
+      const error = new Error('Google Sheet chưa cấp quyền xem. Hãy mở Google Sheet -> bấm Chia sẻ -> Đặt quyền "Bất kỳ ai có đường liên kết - Người xem" rồi bấm Xong để hoàn tất.');
+      error.statusCode = 400;
       throw error;
     }
 
-    const text = await response.text();
     const parsedLines = parseCSV(text);
     if (parsedLines.length === 0) throw new Error('CSV data is empty.');
 
