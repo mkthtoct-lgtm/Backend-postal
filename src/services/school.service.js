@@ -126,16 +126,17 @@ class SchoolService {
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,text/csv,*/*;q=0.8'
     };
 
-    const primaryUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${gid}`;
-    const fallbackUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&gid=${gid}`;
+    // Use gviz/tq?tqx=out:csv FIRST as primary endpoint (works 100% without Google 401 login prompt)
+    const primaryUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&gid=${gid}`;
+    const fallbackUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${gid}`;
 
-    console.log(`[SchoolService] Syncing from Sheet: ${primaryUrl}`);
+    console.log(`[SchoolService] Syncing from Sheet via gviz: ${primaryUrl}`);
 
     let response = await fetch(primaryUrl, { headers: browserHeaders });
     let text = response.ok ? await response.text() : '';
 
     if (!response.ok || text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
-      console.log(`[SchoolService] Primary export failed, trying fallback gviz endpoint: ${fallbackUrl}`);
+      console.log(`[SchoolService] Primary gviz export failed, trying fallback export endpoint: ${fallbackUrl}`);
       const fallbackResponse = await fetch(fallbackUrl, { headers: browserHeaders });
       if (fallbackResponse.ok) {
         const fallbackText = await fallbackResponse.text();
