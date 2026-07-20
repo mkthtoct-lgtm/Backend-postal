@@ -105,7 +105,10 @@ class SchoolController {
       return res.json({ success: true, message: `Đã đồng bộ ${result.count} trường thành công.`, data: result });
     } catch (error) {
       console.error('Error syncing source:', error);
-      return res.status(500).json({ success: false, message: 'Lỗi máy chủ khi đồng bộ.', error: error.message });
+      return res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || 'Lỗi máy chủ khi đồng bộ.',
+      });
     }
   }
 

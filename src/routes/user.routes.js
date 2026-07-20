@@ -96,7 +96,7 @@ const router = express.Router();
  *       401:
  *         description: Chưa đăng nhập hoặc token hết hạn
  */
-router.get('/', authMiddleware, checkPermission('users:read'), userController.getAllUsers);
+router.get('/', authMiddleware, userController.getAllUsers);
 
 /**
  * @swagger
