@@ -113,7 +113,15 @@ class SchoolService {
     console.log(`[SchoolService] Syncing from Sheet: ${csvUrl}`);
 
     const response = await fetch(csvUrl);
-    if (!response.ok) throw new Error(`Google Sheets fetch failed: ${response.status}`);
+    if (!response.ok) {
+      const error = new Error(
+        response.status === 401 || response.status === 403
+          ? 'Google Sheet chưa cấp quyền xem. Hãy đặt quyền "Bất kỳ ai có đường liên kết - Người xem" rồi thử lại.'
+          : `Không thể tải dữ liệu Google Sheet (HTTP ${response.status}).`
+      );
+      error.statusCode = response.status === 401 || response.status === 403 ? 400 : 502;
+      throw error;
+    }
 
     const text = await response.text();
     const parsedLines = parseCSV(text);
