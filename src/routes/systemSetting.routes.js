@@ -44,17 +44,40 @@ router.get('/', authMiddleware, checkPermission('settings:manage'), systemSettin
  *             properties:
  *               enabled:
  *                 type: boolean
+ *               apiKey:
+ *                 type: string
+ *                 description: API Key của Gemini/OpenAI. Chỉ gửi khi muốn THIẾT LẬP/THAY ĐỔI key - để trống hoặc bỏ qua trường này để giữ nguyên key đã lưu. Dùng route DELETE /system-settings/chat/api-key để xoá hẳn key.
  *               model:
  *                 type: string
  *               systemPrompt:
  *                 type: string
  *               welcomeMessage:
  *                 type: string
+ *               companyKnowledgeBase:
+ *                 type: string
+ *                 description: Kiến thức nền về công ty (dùng cho cả 2 chế độ trò chuyện)
+ *               customerCareSystemPrompt:
+ *                 type: string
+ *                 description: Giọng điệu/persona dành cho khách hàng, CTV, Đại lý
  *     responses:
  *       200:
  *         description: Cập nhật thành công
  */
 router.post('/chat', authMiddleware, checkPermission('settings:manage'), systemSettingController.updateChatSettings);
+
+/**
+ * @swagger
+ * /system-settings/chat/api-key:
+ *   delete:
+ *     summary: Xoá API Key của Chatbot AI khỏi hệ thống (để tránh lộ dữ liệu, Chatbot sẽ ngừng hoạt động cho tới khi nhập lại key mới)
+ *     tags: [System Settings]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Đã xoá API Key thành công
+ */
+router.delete('/chat/api-key', authMiddleware, checkPermission('settings:manage'), systemSettingController.clearChatApiKey);
 
 /**
  * @swagger

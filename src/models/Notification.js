@@ -38,6 +38,14 @@ const notificationSchema = new mongoose.Schema(
         type: [String], // ['dept-hanh-chinh', 'dept-nhan-su', 'dept-ke-toan', 'dept-ho-so', 'dept-tuyen-sinh']
         default: [],
       },
+      // [CRM AUTOMATION] Cho phép nhắm thông báo trực tiếp tới 1 hoặc nhiều
+      // người dùng cụ thể (vd: đúng nhân sự/CTV đang phụ trách 1 lead), độc
+      // lập với việc lọc theo group/role/department ở trên.
+      userIds: {
+        type: [mongoose.Schema.Types.ObjectId],
+        ref: 'User',
+        default: [],
+      },
     },
     readBy: [
       {

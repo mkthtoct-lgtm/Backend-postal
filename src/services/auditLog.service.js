@@ -12,9 +12,14 @@ class AuditLogService {
   async log(userId, action, target, metadata = {}) {
     try {
       const isLoginAction = action === 'auth.login';
-      let shouldLog = isLoginAction;
+      // Các hành động tự động của hệ thống (CRM automation: tự gán, tự nhắc,
+      // tự đóng lead... và Marketing automation: chăm sóc, tái kết nối, bản
+      // tin...) luôn được ghi log để đảm bảo có thể truy vết, bất kể "diễn
+      // viên" thực hiện có phải Admin hay không.
+      const isAutomationAction = typeof action === 'string' && (action.startsWith('automation.') || action.startsWith('marketing.'));
+      let shouldLog = isLoginAction || isAutomationAction;
 
-      // Nếu không phải hành động đăng nhập, kiểm tra xem người thực hiện có phải là Admin không
+      // Nếu không phải hành động đăng nhập/tự động, kiểm tra xem người thực hiện có phải là Admin không
       if (!shouldLog && userId) {
         const User = require('../models/User');
         const user = await User.findById(userId).populate('roleId');

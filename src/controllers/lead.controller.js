@@ -2,6 +2,8 @@ const leadService = require('../services/lead.service');
 const crmService = require('../services/crm.service');
 const auditLogService = require('../services/auditLog.service');
 const googleDriveService = require('../services/googleDrive.service');
+const automationService = require('../services/automation.service');
+const marketingAutomationService = require('../services/marketingAutomation.service');
 const mongoose = require('mongoose');
 
 class LeadController {
@@ -205,6 +207,11 @@ class LeadController {
         } catch (commErr) {
           console.error('[LeadController] Lỗi khi tự động tính hoa hồng đơn hàng lúc tạo mới:', commErr.message);
         }
+
+        // [MARKETING AUTOMATION] Gửi email cảm ơn khách hàng (chạy nền, không chặn phản hồi)
+        marketingAutomationService.sendThankYouOnConversion(lead).catch((mktErr) => {
+          console.error('[MarketingAutomationService] Lỗi khi gửi email cảm ơn lúc tạo mới:', mktErr.message);
+        });
       }
 
       // 2. Gọi API BizFly CRM Webhook để đồng bộ thông tin khách hàng (Chạy nền không chặn để phản hồi nhanh)
@@ -228,6 +235,14 @@ class LeadController {
           { customerName: lead.customerName, phone: lead.phone, status: lead.status }
         );
       }
+
+      // 4. Chạy CRM Automation: phát hiện trùng lặp, tự động phân công nhân
+      // sự nội bộ (nếu chưa có CTV giới thiệu), gửi email xác nhận cho khách
+      // hàng và thông báo nội bộ cho người phụ trách + cấp quản lý.
+      // (Chạy nền không chặn để phản hồi API nhanh cho CTV)
+      automationService.processNewLead(lead).catch((autoErr) => {
+        console.error('[AutomationService] Lỗi khi chạy CRM Automation cho lead mới:', autoErr.message);
+      });
 
       return res.status(201).json({
         success: true,
@@ -371,6 +386,11 @@ class LeadController {
         } catch (commErr) {
           console.error('[LeadController] Lỗi khi tự động tính hoa hồng đơn hàng:', commErr.message);
         }
+
+        // [MARKETING AUTOMATION] Gửi email cảm ơn khách hàng (chạy nền, không chặn phản hồi)
+        marketingAutomationService.sendThankYouOnConversion(updatedLead).catch((mktErr) => {
+          console.error('[MarketingAutomationService] Lỗi khi gửi email cảm ơn:', mktErr.message);
+        });
       }
 
       // ĐỒNG BỘ CRM: Đẩy thông tin trạng thái mới và đơn hàng/hoa hồng lên BizFly CRM
@@ -514,6 +534,11 @@ class LeadController {
           } catch (commErr) {
             console.error('[Bizfly Webhook] Lỗi khi tự động tính hoa hồng đơn hàng:', commErr.message);
           }
+
+          // [MARKETING AUTOMATION] Gửi email cảm ơn khách hàng (chạy nền, không chặn phản hồi)
+          marketingAutomationService.sendThankYouOnConversion(lead).catch((mktErr) => {
+            console.error('[MarketingAutomationService] Lỗi khi gửi email cảm ơn (Bizfly Webhook):', mktErr.message);
+          });
         }
 
         // Ghi lịch sử cập nhật trạng thái (Actor là System/Bizfly CRM)

@@ -23,6 +23,8 @@ const aiConfigRoutes = require('./routes/aiConfig.routes');
 const roleRoutes = require('./routes/role.routes');
 const schoolRoutes = require('./routes/school.routes');
 const surveyRoutes = require('./routes/survey.routes');
+const automationRoutes = require('./routes/automation.routes');
+const marketingRoutes = require('./routes/marketing.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 const env = require('./configs/env');
 const responseNormalizer = require('./middlewares/responseNormalizer');
@@ -107,6 +109,10 @@ app.use('/api/v1/roles', roleRoutes);
 app.use('/api/v1/schools', schoolRoutes);
 // Khai báo định tuyến cho hệ thống Khảo sát (Surveys)
 app.use('/api/v1/surveys', surveyRoutes);
+// Khai báo định tuyến cho hệ thống CRM Automation (Tự động hoá quy trình CRM, không dùng AI)
+app.use('/api/v1/automation', automationRoutes);
+// Khai báo định tuyến cho hệ thống Marketing Automation (Chăm sóc & giữ chân khách hàng, không dùng AI)
+app.use('/api/v1/marketing', marketingRoutes);
 
 app.get('/', (req, res) => {
   res.json({

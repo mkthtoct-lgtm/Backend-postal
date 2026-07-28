@@ -54,6 +54,8 @@ class NotificationService {
         $or: [
           { 'target.groups': { $in: groups } },
           { 'target.roles': feRoleSlug },
+          // [CRM AUTOMATION] Thông báo nhắm trực tiếp tới đúng user này
+          { 'target.userIds': userId },
         ]
       };
 
