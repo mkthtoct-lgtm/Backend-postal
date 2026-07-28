@@ -1,5 +1,6 @@
 const geminiService = require('../services/gemini.service');
 const Role = require('../models/Role');
+const User = require('../models/User');
 
 class ChatController {
   /**
@@ -18,19 +19,30 @@ class ChatController {
 
       // Lấy thông tin role và quyền hạn của user từ JWT token
       const userContext = {
-        name: req.user.name || 'Nhân viên',
+        name: '',
         email: req.user.email || '',
         roleId: req.user.roleId || null,
         roleName: 'Nhân viên',
+        roleSlug: null,
         permissions: []
       };
 
-      if (userContext.roleId) {
-        const role = await Role.findById(userContext.roleId).lean();
-        if (role) {
-          userContext.roleName = role.name;
-          userContext.permissions = role.permissions || [];
-        }
+      // Lưu ý: middleware xác thực (auth.js) hiện KHÔNG đính kèm tên người
+      // dùng vào req.user, nên cần truy vấn riêng để chatbot có thể xưng hô
+      // đúng tên, giúp cuộc trò chuyện cá nhân hoá và giàu cảm xúc hơn.
+      const [role, dbUser] = await Promise.all([
+        userContext.roleId ? Role.findById(userContext.roleId).lean() : null,
+        req.user.sub ? User.findById(req.user.sub).select('fullName').lean() : null,
+      ]);
+
+      if (role) {
+        userContext.roleName = role.name;
+        userContext.roleSlug = role.slug || null;
+        userContext.permissions = role.permissions || [];
+      }
+
+      if (dbUser?.fullName) {
+        userContext.name = dbUser.fullName;
       }
 
       // Gọi service với context phân quyền của user

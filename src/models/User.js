@@ -93,6 +93,12 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Thời điểm gần nhất người dùng này được hệ thống tự động phân công
+    // 1 lead để chăm sóc (dùng cho thuật toán round-robin của CRM Automation).
+    lastAssignedAt: {
+      type: Date,
+      default: null,
+    },
     bannerUrl: {
       type: String,
       default: null,

@@ -1,4 +1,5 @@
 const NewsPost = require('../models/NewsPost');
+const marketingAutomationService = require('./marketingAutomation.service');
 
 class NewsPostService {
   /**
@@ -41,7 +42,16 @@ class NewsPostService {
     }
 
     const newArticle = new NewsPost(data);
-    return await newArticle.save();
+    const savedArticle = await newArticle.save();
+
+    // [MARKETING AUTOMATION] Gửi bản tin cho khách hàng đang hoạt động khi có
+    // tin tức/sự kiện mới (chạy nền, tự kiểm tra công tắc bật/tắt bên trong
+    // service - mặc định TẮT cho tới khi Admin chủ động bật).
+    marketingAutomationService.broadcastNewsletter(savedArticle).catch((error) => {
+      console.error('[NewsPostService] Lỗi khi gửi bản tin newsletter tự động:', error.message);
+    });
+
+    return savedArticle;
   }
 
   /**
