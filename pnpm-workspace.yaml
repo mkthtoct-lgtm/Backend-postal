@@ -1,0 +1,4 @@
+allowBuilds:
+  '@scarf/scarf': set this to true or false
+minimumReleaseAgeExclude:
+  - mongoose@9.6.3

@@ -1,0 +1,80 @@
+const ProductCategory = require('../models/ProductCategory');
+
+class ProductCategoryService {
+  /**
+   * Lấy danh sách toàn bộ danh mục sản phẩm chưa bị xóa mềm và đang hoạt động
+   */
+  async findAll() {
+    return await ProductCategory.find({ 
+      $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      status: 'active'  // CHỈ LẤY CATEGORY ĐANG HOẠT ĐỘNG
+    }).sort({ createdAt: -1 });
+  }
+
+  /**
+   * Tìm kiếm danh mục bằng ID
+   */
+  async findById(id) {
+    return await ProductCategory.findOne({ 
+      _id: id, 
+      $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      status: 'active' 
+    });
+  }
+
+  /**
+   * Tìm kiếm danh mục sản phẩm bằng tên
+   */
+  async findByName(name) {
+    return await ProductCategory.findOne({
+      name: { $regex: new RegExp(`^${name.trim()}$`, 'i') },
+      $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+      status: 'active'
+    });
+  }
+
+  /**
+   * Tạo danh mục sản phẩm mới
+   */
+  async create(data) {
+    const newCategory = new ProductCategory({
+      name: data.name.trim(),
+      description: data.description ? data.description.trim() : '',
+      status: data.status || 'active',  // Mặc định là active
+      coverImageUrl: data.coverImageUrl ? data.coverImageUrl.trim() : '',
+      image: data.image ? data.image.trim() : '',
+    });
+    return await newCategory.save();
+  }
+
+  /**
+   * Cập nhật thông tin danh mục sản phẩm
+   */
+  async update(id, data) {
+    const updateData = {};
+    if (data.name !== undefined) updateData.name = data.name.trim();
+    if (data.description !== undefined) updateData.description = data.description.trim();
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.coverImageUrl !== undefined) updateData.coverImageUrl = data.coverImageUrl.trim();
+    if (data.image !== undefined) updateData.image = data.image.trim();
+
+    return await ProductCategory.findOneAndUpdate(
+      { _id: id, $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }] },
+      { $set: updateData },
+      { returnDocument: 'after', runValidators: true }
+    );
+  }
+
+  /**
+   * Xóa mềm danh mục sản phẩm (đặt deletedAt và status = 'hidden')
+   */
+  async softDelete(id) {
+    return await ProductCategory.findByIdAndUpdate(
+      id,
+      { $set: { deletedAt: new Date(), status: 'hidden' } },
+      { returnDocument: 'after' }
+    );
+  }
+}
+
+module.exports = new ProductCategoryService();

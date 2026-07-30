@@ -1,0 +1,474 @@
+const authService = require('../services/auth.service');
+
+const PERMISSION_ALIASES = {
+  'documents:view': 'documents:read',
+  'documents:upload': 'documents:write',
+  'documents:edit': 'documents:write',
+  'documents:delete': 'documents:write',
+  'notifications:view': 'notifications:read',
+  'notifications:create': 'notifications:write',
+  'users:view': 'users:read',
+  'users:edit': 'users:write',
+  'users:lock': 'users:write',
+};
+
+const expandPermissions = (permissions = []) => {
+  const expanded = new Set();
+  permissions.filter(Boolean).forEach((permission) => {
+    expanded.add(permission);
+    if (PERMISSION_ALIASES[permission]) expanded.add(PERMISSION_ALIASES[permission]);
+  });
+  return Array.from(expanded);
+};
+
+// Hàm helper kiểm tra định dạng email hợp lệ
+const validateEmailFormat = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+// Hàm helper kiểm tra độ phức tạp của mật khẩu
+const validatePasswordComplexity = (password) => {
+  if (password.length <= 6) {
+    return {
+      isValid: false,
+      message: 'Mật khẩu phải dài hơn 6 ký tự.',
+    };
+  }
+
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>_\-+=\[\]{};':"\\|\\`~]/.test(password);
+
+  if (!hasUppercase || !hasNumber || !hasSpecialChar) {
+    return {
+      isValid: false,
+      message: 'Mật khẩu phải chứa ít nhất 1 chữ in hoa, 1 chữ số và 1 ký tự đặc biệt.',
+    };
+  }
+
+  return { isValid: true };
+};
+
+// Hàm helper làm sạch và chuyển đổi User object chỉ giữ lại các trường của Mongoose Schema
+const toCleanUserResponse = (user) => {
+  if (!user) return null;
+  const roleIdStr = user.roleId
+    ? (user.roleId._id ? user.roleId._id.toString() : user.roleId.toString())
+    : null;
+  const roleSlug = user.roleId && user.roleId.slug ? user.roleId.slug : null;
+  const rolePermissions = user.roleId && Array.isArray(user.roleId.permissions)
+    ? user.roleId.permissions
+    : [];
+  const grantedPermissions = Array.isArray(user.grantedPermissions) ? user.grantedPermissions : [];
+  const permissions = expandPermissions([...rolePermissions, ...grantedPermissions]);
+
+  const departmentIdStr = user.departmentId
+    ? (user.departmentId._id ? user.departmentId._id.toString() : user.departmentId.toString())
+    : null;
+  const departmentName = user.departmentId && user.departmentId.name ? user.departmentId.name : null;
+
+  return {
+    _id: user._id.toString(),
+    fullName: user.fullName,
+    email: user.email,
+    phone: user.phone || null,
+    socialLink: user.socialLink || null,
+    zaloLink: user.zaloLink || null,
+    instagramLink: user.instagramLink || null,
+    city: user.city || null,
+    ward: user.ward || null,
+    addressDetail: user.addressDetail || null,
+    address: user.address || null,
+    referral_code_user: user.referral_code_user || null,
+    referral_code: user.referral_code || null,
+    referred_by_user_id: user.referred_by_user_id || null,
+    avatarUrl: user.avatarUrl || null,
+    bannerUrl: user.bannerUrl || null,
+    roleId: roleIdStr,
+    role: roleSlug,
+    permissions,
+    grantedPermissions,
+    departmentId: departmentIdStr,
+    departmentName,
+    status: user.status,
+    dealCount: user.dealCount || 0,
+    lastLoginAt: user.lastLoginAt || null,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+};
+
+class AuthController {
+  /**
+   * Kiểm tra email đã tồn tại trong hệ thống chưa (Check Email)
+   */
+  async checkEmail(req, res) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng cung cấp địa chỉ email cần kiểm tra.',
+        });
+      }
+
+      if (!validateEmailFormat(email)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Định dạng Email không hợp lệ (Ví dụ: user@example.com).',
+        });
+      }
+
+      const userService = require('../services/user.service');
+      const existing = await userService.findByEmail(email);
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          available: !existing,
+          message: existing
+            ? 'Email này đã được sử dụng trong hệ thống.'
+            : 'Email hợp lệ, có thể sử dụng để đăng ký.',
+        },
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi kiểm tra email.',
+      });
+    }
+  }
+
+  /**
+   * Đăng ký tài khoản mới (Register)
+   */
+  async register(req, res) {
+    try {
+      const { email, password, fullName } = req.body;
+
+      // Validation đầu vào cơ bản
+      if (!email || !password || !fullName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng điền đầy đủ các thông tin: Họ tên, Email và Mật khẩu.',
+        });
+      }
+
+      if (!validateEmailFormat(email)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Định dạng Email không hợp lệ (Ví dụ: user@example.com).',
+        });
+      }
+
+      const passwordValidation = validatePasswordComplexity(password);
+      if (!passwordValidation.isValid) {
+        return res.status(400).json({
+          success: false,
+          message: passwordValidation.message,
+        });
+      }
+
+      const result = await authService.register({ email, password, fullName });
+
+      return res.status(201).json({
+        success: true,
+        message: 'Đăng ký tài khoản thành công.',
+        data: result,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || 'Lỗi xảy ra trong quá trình đăng ký.',
+      });
+    }
+  }
+
+  /**
+   * Cập nhật thông tin bổ sung sau khi đăng ký thành công (Register Profile)
+   */
+  async registerProfile(req, res) {
+    try {
+      const { userId, phone, socialLink, city, ward, addressDetail, referralCode } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Thiếu userId người dùng cần cập nhật thông tin.',
+        });
+      }
+
+      const updatedUser = await authService.registerProfile({
+        userId,
+        phone,
+        socialLink,
+        city,
+        ward,
+        addressDetail,
+        referralCode,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Bổ sung thông tin tài khoản thành công.',
+        data: updatedUser,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || 'Lỗi xảy ra trong quá trình bổ sung thông tin.',
+      });
+    }
+  }
+
+  /**
+   * Đăng nhập người dùng (Login)
+   */
+  async login(req, res) {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng cung cấp cả Email và Mật khẩu.',
+        });
+      }
+
+      // Xác thực user
+      const authenticatedUser = await authService.validateUser({ email, password });
+
+      // Phát hành bộ token
+      const result = await authService.login(authenticatedUser);
+
+      // Ghi lịch sử thao tác đăng nhập
+      const auditLogService = require('../services/auditLog.service');
+      auditLogService.log(
+        authenticatedUser.id,
+        'auth.login',
+        { type: 'user', id: authenticatedUser.id, name: authenticatedUser.fullName },
+        { ip: req.ip || req.connection?.remoteAddress || 'Unknown', device: req.headers['user-agent'] || 'Unknown' }
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: 'Đăng nhập hệ thống thành công.',
+        data: result,
+      });
+    } catch (error) {
+      // Tài khoản chưa hoàn tất đăng ký → trả về userId để Frontend redirect về trang register-profile
+      if (error.code === 'ACCOUNT_PENDING') {
+        return res.status(403).json({
+          success: false,
+          error_code: 'ACCOUNT_PENDING',
+          message: error.message,
+          data: { userId: error.userId },
+        });
+      }
+      return res.status(401).json({
+        success: false,
+        message: error.message || 'Email hoặc mật khẩu không chính xác.',
+      });
+    }
+  }
+
+  /**
+   * Làm mới Access Token (Refresh Token)
+   */
+  async refresh(req, res) {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        return res.status(400).json({
+          success: false,
+          message: 'Không tìm thấy refreshToken trong request body.',
+        });
+      }
+
+      const result = await authService.refresh({ refreshToken });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Làm mới token thành công.',
+        data: result,
+      });
+    } catch (error) {
+      return res.status(401).json({
+        success: false,
+        message: error.message || 'Làm mới token thất bại.',
+      });
+    }
+  }
+
+  /**
+   * Đăng xuất tài khoản (Logout)
+   */
+  async logout(req, res) {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        return res.status(400).json({
+          success: false,
+          message: 'Không tìm thấy refreshToken trong request body.',
+        });
+      }
+
+      const result = await authService.logout({ refreshToken });
+
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || 'Đăng xuất thất bại.',
+      });
+    }
+  }
+
+  /**
+   * Yêu cầu khôi phục mật khẩu khi quên (Forgot Password)
+   */
+  async forgotPassword(req, res) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng nhập email tài khoản cần khôi phục mật khẩu.',
+        });
+      }
+
+      if (!validateEmailFormat(email)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Định dạng Email không hợp lệ (Ví dụ: user@example.com).',
+        });
+      }
+
+      const result = await authService.forgotPassword({ email }, req.headers.origin);
+
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || 'Yêu cầu khôi phục mật khẩu thất bại.',
+      });
+    }
+  }
+
+  /**
+   * Thiết lập mật khẩu mới (Reset Password)
+   */
+  async resetPassword(req, res) {
+    try {
+      const { token, password } = req.body;
+
+      if (!token || !password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Thiếu liên kết token xác thực hoặc mật khẩu mới.',
+        });
+      }
+
+      const passwordValidation = validatePasswordComplexity(password);
+      if (!passwordValidation.isValid) {
+        return res.status(400).json({
+          success: false,
+          message: passwordValidation.message,
+        });
+      }
+
+      const result = await authService.resetPassword({ token, password });
+
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || 'Đặt lại mật khẩu thất bại.',
+      });
+    }
+  }
+
+  /**
+   * Xem thông tin người dùng đang đăng nhập (Profile)
+   */
+  async me(req, res) {
+    try {
+      const userService = require('../services/user.service');
+      const user = await userService.findById(req.user.sub);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy thông tin tài khoản người dùng.',
+        });
+      }
+
+      // Đếm số lượng deal thực tế từ lead
+      const Lead = require('../models/Lead');
+      const dealCount = await Lead.countDocuments({ collaboratorId: req.user.sub, status: 'xu_ly_ho_so', deletedAt: null });
+      user.dealCount = dealCount;
+
+      return res.status(200).json({
+        success: true,
+        data: toCleanUserResponse(user),
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi lấy thông tin tài khoản cá nhân.',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Lấy mã giới thiệu và link giới thiệu của người dùng đang đăng nhập
+   */
+  async getReferralInfo(req, res) {
+    try {
+      const userService = require('../services/user.service');
+      const userId = req.user.sub;
+      const user = await userService.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy người dùng.',
+        });
+      }
+
+      const env = require('../configs/env');
+      const referralCode = user.referral_code || '';
+      const origin = req.headers.origin || env.FRONTEND_URL;
+      const referralUrl = `${origin}/register?ref=${referralCode}`;
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          referralCode,
+          referralUrl,
+        },
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi lấy thông tin giới thiệu.',
+        error: error.message,
+      });
+    }
+  }
+}
+
+module.exports = new AuthController();
