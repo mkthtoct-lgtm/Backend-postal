@@ -40,7 +40,14 @@ class MediaController {
   // POST /api/v1/media
   async create(req, res) {
     try {
-      const newMedia = await mediaService.createMedia(req.body);
+      const data = { ...req.body };
+      
+      // Nếu có file upload, dùng đường dẫn file vừa lưu
+      if (req.file) {
+        data.thumbnail_url = `/uploads/${req.file.filename}`;
+      }
+
+      const newMedia = await mediaService.createMedia(data);
       return res.status(201).json({
         success: true,
         message: 'Tạo media mới thành công',
@@ -54,7 +61,14 @@ class MediaController {
   // PUT /api/v1/media/:id
   async update(req, res) {
     try {
-      const updatedMedia = await mediaService.updateMedia(req.params.id, req.body);
+      const data = { ...req.body };
+      
+      // Nếu có file upload, cập nhật đường dẫn ảnh mới
+      if (req.file) {
+        data.thumbnail_url = `/uploads/${req.file.filename}`;
+      }
+
+      const updatedMedia = await mediaService.updateMedia(req.params.id, data);
       if (!updatedMedia) {
         return res.status(404).json({ success: false, message: 'Không tìm thấy media để cập nhật' });
       }
