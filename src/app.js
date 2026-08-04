@@ -25,6 +25,7 @@ const schoolRoutes = require('./routes/school.routes');
 const surveyRoutes = require('./routes/survey.routes');
 const automationRoutes = require('./routes/automation.routes');
 const marketingRoutes = require('./routes/marketing.routes');
+const mediaRoutes = require('./routes/media.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 const env = require('./configs/env');
 const responseNormalizer = require('./middlewares/responseNormalizer');
@@ -97,6 +98,8 @@ app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/leads', leadRoutes);
 // Khai báo định tuyến cho hệ thống đối soát hoa hồng (Commissions)
 app.use('/api/v1/commissions', commissionRoutes);
+// Khai báo định tuyến cho hệ thống Media Repository
+app.use('/api/v1/media', mediaRoutes);
 // Khai báo định tuyến cho hệ thống Chatbot với Google Gemini AI
 app.use('/api/v1/chat', chatRoutes);
 // Khai báo định tuyến cho hệ thống Cấu hình hệ thống (System Settings)
