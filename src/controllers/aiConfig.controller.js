@@ -2,7 +2,7 @@ const aiConfigService = require('../services/aiConfig.service');
 
 class AiConfigController {
   /**
-   * Lấy cấu hình AI.
+   * Lấy cấu hình AI
    */
   async getAIConfig(req, res) {
     try {
