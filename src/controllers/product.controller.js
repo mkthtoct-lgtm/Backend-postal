@@ -1,4 +1,5 @@
 const productService = require('../services/product.service');
+const googleDriveService = require('../services/googleDrive.service');
 
 class ProductController {
   /**
@@ -77,9 +78,19 @@ class ProductController {
     try {
       const data = { ...req.body };
 
-      // Nếu có file upload, ưu tiên dùng đường dẫn file vừa lưu
+      // Nếu có file upload, ưu tiên dùng Google Drive, nếu lỗi thì fallback lưu local
       if (req.file) {
-        data.image = `/uploads/${req.file.filename}`;
+        try {
+          const driveResult = await googleDriveService.uploadFile(req.file);
+          if (driveResult && driveResult.webViewLink) {
+            data.image = driveResult.webViewLink;
+          } else {
+            data.image = `/uploads/${req.file.filename}`;
+          }
+        } catch (uploadError) {
+          console.error("Lỗi đẩy ảnh sản phẩm lên Drive, fallback dùng local:", uploadError);
+          data.image = `/uploads/${req.file.filename}`;
+        }
       }
 
       // Trực quan hóa và chuẩn hóa các giá trị đầu vào mới
@@ -133,7 +144,17 @@ class ProductController {
       const data = { ...req.body };
 
       if (req.file) {
-        data.image = `/uploads/${req.file.filename}`;
+        try {
+          const driveResult = await googleDriveService.uploadFile(req.file);
+          if (driveResult && driveResult.webViewLink) {
+            data.image = driveResult.webViewLink;
+          } else {
+            data.image = `/uploads/${req.file.filename}`;
+          }
+        } catch (uploadError) {
+          console.error("Lỗi đẩy ảnh sản phẩm lên Drive khi cập nhật, fallback dùng local:", uploadError);
+          data.image = `/uploads/${req.file.filename}`;
+        }
       }
 
       // Lấy thông tin sản phẩm cũ để có name hoặc visaCode nếu một trong hai không được gửi lên
