@@ -97,6 +97,8 @@ app.use('/api/v1/news-posts', newsPostRoutes);
 app.use('/api/v1/products', productRoutes);
 // Khai báo định tuyến cho hệ thống Leads & CRM (Leads)
 app.use('/api/v1/leads', leadRoutes);
+// Khai báo định tuyến cho đăng ký tư vấn khóa học
+app.use('/api/v1/course-leads', courseLeadRoutes);
 // Khai báo định tuyến cho hệ thống đối soát hoa hồng (Commissions)
 app.use('/api/v1/commissions', commissionRoutes);
 // Khai báo định tuyến cho hệ thống Media Repository
