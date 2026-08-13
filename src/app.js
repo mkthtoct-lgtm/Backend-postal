@@ -26,6 +26,7 @@ const surveyRoutes = require('./routes/survey.routes');
 const automationRoutes = require('./routes/automation.routes');
 const marketingRoutes = require('./routes/marketing.routes');
 const mediaRoutes = require('./routes/media.routes');
+const courseLeadRoutes = require('./routes/courseLead.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 const env = require('./configs/env');
 const responseNormalizer = require('./middlewares/responseNormalizer');
