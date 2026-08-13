@@ -1,5 +1,6 @@
 const productService = require('../services/product.service');
 const googleDriveService = require('../services/googleDrive.service');
+const fs = require('fs');
 
 class ProductController {
   /**
@@ -78,18 +79,29 @@ class ProductController {
     try {
       const data = { ...req.body };
 
-      // Nếu có file upload, ưu tiên dùng Google Drive, nếu lỗi thì fallback lưu local
+      // Upload ảnh lên Google Drive qua Service
       if (req.file) {
         try {
           const driveResult = await googleDriveService.uploadFile(req.file);
           if (driveResult && driveResult.webViewLink) {
             data.image = driveResult.webViewLink;
-          } else {
-            data.image = `/uploads/${req.file.filename}`;
+            data.imageFileId = driveResult.fileId;
+            data.imageMimeType = req.file.mimetype;
           }
         } catch (uploadError) {
-          console.error("Lỗi đẩy ảnh sản phẩm lên Drive, fallback dùng local:", uploadError);
-          data.image = `/uploads/${req.file.filename}`;
+          console.error("Lỗi đẩy ảnh sản phẩm lên Drive:", uploadError);
+          return res.status(500).json({
+            success: false,
+            message: 'Lỗi tải ảnh lên Google Drive.',
+            error: uploadError.message
+          });
+        } finally {
+          // Xóa file rác local
+          try {
+            if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+          } catch (e) {
+            console.error("Lỗi xóa file local:", e);
+          }
         }
       }
 
@@ -99,8 +111,8 @@ class ProductController {
       if (data.purpose) data.purpose = data.purpose.trim();
       if (data.name) data.name = data.name.trim();
 
-      // Tự động nối tên sản phẩm và mã visa theo quy chuẩn: Tên - VisaCode
-      if (data.name && data.visaCode) {
+      // Tự động nối tên sản phẩm và mã visa theo quy chuẩn: Tên - VisaCode (Trừ Đào tạo)
+      if (data.name && data.visaCode && data.purpose !== 'dao_tao') {
         data.name = `${data.name} - ${data.visaCode}`;
       }
 
@@ -143,27 +155,44 @@ class ProductController {
       const { id } = req.params;
       const data = { ...req.body };
 
-      if (req.file) {
-        try {
-          const driveResult = await googleDriveService.uploadFile(req.file);
-          if (driveResult && driveResult.webViewLink) {
-            data.image = driveResult.webViewLink;
-          } else {
-            data.image = `/uploads/${req.file.filename}`;
-          }
-        } catch (uploadError) {
-          console.error("Lỗi đẩy ảnh sản phẩm lên Drive khi cập nhật, fallback dùng local:", uploadError);
-          data.image = `/uploads/${req.file.filename}`;
-        }
-      }
-
-      // Lấy thông tin sản phẩm cũ để có name hoặc visaCode nếu một trong hai không được gửi lên
+      // Lấy thông tin sản phẩm cũ trước để xử lý xóa ảnh cũ và lấy thông tin cơ bản
       const existingProduct = await productService.findById(id);
       if (!existingProduct) {
         return res.status(404).json({
           success: false,
           message: 'Không tìm thấy sản phẩm để cập nhật.',
         });
+      }
+
+      // Upload ảnh lên Google Drive qua Service
+      if (req.file) {
+        try {
+          const driveResult = await googleDriveService.uploadFile(req.file);
+          if (driveResult && driveResult.webViewLink) {
+            data.image = driveResult.webViewLink;
+            data.imageFileId = driveResult.fileId;
+            data.imageMimeType = req.file.mimetype;
+            
+            // Xóa ảnh cũ trên Drive nếu có
+            if (existingProduct.imageFileId) {
+              await googleDriveService.deleteFile(existingProduct.imageFileId);
+            }
+          }
+        } catch (uploadError) {
+          console.error("Lỗi đẩy ảnh sản phẩm lên Drive khi cập nhật:", uploadError);
+          return res.status(500).json({
+            success: false,
+            message: 'Lỗi tải ảnh lên Google Drive.',
+            error: uploadError.message
+          });
+        } finally {
+          // Xóa file rác local
+          try {
+            if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+          } catch (e) {
+            console.error("Lỗi xóa file local:", e);
+          }
+        }
       }
 
       // Xác định baseName cũ (loại bỏ phần visaCode nếu có định dạng "Tên - VisaCode")
@@ -182,8 +211,10 @@ class ProductController {
       if (data.visaCode !== undefined) data.visaCode = visaCode;
       if (data.purpose !== undefined) data.purpose = data.purpose.trim();
 
-      // Cập nhật tên hoàn chỉnh
-      if (baseName && visaCode) {
+      const purpose = data.purpose !== undefined ? data.purpose.trim() : (existingProduct.purpose || '').trim();
+      
+      // Cập nhật tên hoàn chỉnh (Trừ sản phẩm Đào tạo)
+      if (baseName && visaCode && purpose !== 'dao_tao') {
         data.name = `${baseName} - ${visaCode}`;
       } else if (baseName) {
         data.name = baseName;
