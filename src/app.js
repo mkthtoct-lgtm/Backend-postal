@@ -26,6 +26,7 @@ const surveyRoutes = require('./routes/survey.routes');
 const automationRoutes = require('./routes/automation.routes');
 const marketingRoutes = require('./routes/marketing.routes');
 const mediaRoutes = require('./routes/media.routes');
+const driveRoutes = require('./routes/drive.routes');
 const courseLeadRoutes = require('./routes/courseLead.routes');
 const { swaggerUi, swaggerDocs } = require('./configs/swagger');
 const env = require('./configs/env');
@@ -97,6 +98,8 @@ app.use('/api/v1/news-posts', newsPostRoutes);
 app.use('/api/v1/products', productRoutes);
 // Khai báo định tuyến cho hệ thống Leads & CRM (Leads)
 app.use('/api/v1/leads', leadRoutes);
+// Khai báo định tuyến Google Drive Media Proxy
+app.use('/api/v1/drive', driveRoutes);
 // Khai báo định tuyến cho đăng ký tư vấn khóa học
 app.use('/api/v1/course-leads', courseLeadRoutes);
 // Khai báo định tuyến cho hệ thống đối soát hoa hồng (Commissions)

@@ -197,7 +197,7 @@ const leadController = {
       const leads = await require('../models/courseLead.model')
         .find(query)
         .populate('courseId', 'name image slug')
-        .populate('assignedTo', 'name email')
+        .populate('assignedTo', 'fullName email phone')
         .sort({ createdAt: -1 });
 
       return res.status(200).json({
@@ -220,7 +220,7 @@ const leadController = {
       const lead = await require('../models/courseLead.model')
         .findById(req.params.id)
         .populate('courseId', 'name image slug price')
-        .populate('assignedTo', 'name email');
+        .populate('assignedTo', 'fullName email phone');
         
       if (!lead) {
         return res.status(404).json({
@@ -231,7 +231,7 @@ const leadController = {
       
       const history = await require('../models/courseLeadHistory.model')
         .find({ leadId: lead._id })
-        .populate('changedBy', 'name email')
+        .populate('changedBy', 'fullName email')
         .sort({ createdAt: -1 });
 
       return res.status(200).json({
@@ -243,6 +243,37 @@ const leadController = {
       });
     } catch (error) {
       console.error('Lỗi khi lấy chi tiết Lead:', error);
+      return res.status(500).json({ success: false, message: 'Lỗi máy chủ.' });
+    }
+  },
+  // Lấy danh sách Sale có quyền nhận Lead
+  getEligibleSales: async (req, res) => {
+    try {
+      const User = require('../models/User');
+      const users = await User.find({ status: 'active' }).populate('roleId');
+      
+      const eligibleUsers = users.filter(u => {
+        const rolePermissions = u.roleId && Array.isArray(u.roleId.permissions) ? u.roleId.permissions : [];
+        const grantedPermissions = Array.isArray(u.grantedPermissions) ? u.grantedPermissions : [];
+        const permissions = [...rolePermissions, ...grantedPermissions];
+        
+        return permissions.includes('*') || 
+               permissions.includes('leads:write') || 
+               permissions.includes('crm.course_leads.assign');
+      }).map(u => ({
+        _id: u._id,
+        fullName: u.fullName,
+        email: u.email,
+        phone: u.phone,
+        departmentId: u.departmentId
+      }));
+
+      return res.status(200).json({
+        success: true,
+        data: eligibleUsers
+      });
+    } catch (error) {
+      console.error('Lỗi khi lấy danh sách Sale:', error);
       return res.status(500).json({ success: false, message: 'Lỗi máy chủ.' });
     }
   },
@@ -259,8 +290,23 @@ const leadController = {
       const CourseLead = require('../models/courseLead.model');
       const lead = await CourseLead.findById(leadId);
       
-      if (!lead) return res.status(404).json({ success: false, message: 'Lead không tồn tại' });
-      if (lead.status !== 'NEW') return res.status(400).json({ success: false, message: 'Chỉ có thể nhận Lead ở trạng thái NEW' });
+      if (!lead) return res.status(404).json({ success: false, message: 'Không tìm thấy Lead' });
+      
+      if (lead.isArchived) {
+        return res.status(409).json({
+          success: false,
+          code: 'LEAD_ARCHIVED',
+          message: 'Lead đã được lưu trữ và không thể nhận xử lý.'
+        });
+      }
+
+      if (lead.status !== 'NEW') {
+        return res.status(409).json({ 
+          success: false, 
+          code: 'INVALID_STATUS_TRANSITION',
+          message: 'Chỉ có thể nhận Lead ở trạng thái NEW' 
+        });
+      }
       
       lead.status = 'ASSIGNED';
       lead.assignedTo = userId;
@@ -274,8 +320,90 @@ const leadController = {
         changedBy: userId,
         reason: 'Sale nhận Lead'
       });
+      await lead.populate('assignedTo', 'fullName email phone');
       
       return res.status(200).json({ success: true, message: 'Nhận Lead thành công', data: lead });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
+    }
+  },
+  // Trả / Chuyển Lead (ASSIGNED -> NEW hoặc đổi ASSIGNED)
+  reassignLead: async (req, res) => {
+    try {
+      const leadId = req.params.id;
+      const userId = req.user?.sub;
+      const { actionType, targetUserId, reason } = req.body;
+      
+      if (!userId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+
+      const CourseLead = require('../models/courseLead.model');
+      const lead = await CourseLead.findById(leadId);
+      
+      if (!lead) return res.status(404).json({ success: false, message: 'Không tìm thấy Lead' });
+      
+      const User = require('../models/User');
+      const currentUserObj = await User.findById(userId).populate('roleId');
+      let hasAdminOverride = false;
+      if (currentUserObj) {
+        const roleKey = String(currentUserObj.roleId?.name || "").trim().toLowerCase();
+        const perms = [...(currentUserObj.roleId?.permissions || []), ...(currentUserObj.grantedPermissions || [])];
+        hasAdminOverride = roleKey === 'admin' || currentUserObj.roleId?._id?.toString() === "69fc5af582ef85451120772a" || perms.includes('*');
+      }
+
+      if (lead.assignedTo?.toString() !== userId && !hasAdminOverride) {
+        return res.status(403).json({ success: false, message: 'Bạn không phụ trách Lead này và không có quyền điều phối' });
+      }
+      
+      if (lead.status !== 'ASSIGNED' && lead.status !== 'PROCESSING') {
+        return res.status(409).json({ 
+          success: false, 
+          code: 'INVALID_STATUS_TRANSITION',
+          message: 'Chỉ có thể Trả / Chuyển Lead ở trạng thái đã nhận hoặc đang tư vấn' 
+        });
+      }
+      
+      const previousStatus = lead.status;
+      
+      if (actionType === 'RELEASE') {
+        lead.status = 'NEW';
+        lead.assignedTo = null;
+        lead.assignedAt = null;
+        await lead.save();
+        
+        await require('../models/courseLeadHistory.model').create({
+          leadId,
+          fromStatus: previousStatus,
+          toStatus: 'NEW',
+          changedBy: userId,
+          reason: reason || 'Sale trả Lead về hàng chờ.'
+        });
+      } else if (actionType === 'REASSIGN') {
+        if (!targetUserId) {
+          return res.status(400).json({ success: false, message: 'Vui lòng chọn Sale nhận bàn giao.' });
+        }
+        
+        const targetUser = await User.findById(targetUserId).select('fullName email');
+        
+        lead.status = 'ASSIGNED';
+        lead.assignedTo = targetUserId;
+        lead.assignedAt = Date.now();
+        await lead.save();
+        
+        await require('../models/courseLeadHistory.model').create({
+          leadId,
+          fromStatus: previousStatus,
+          toStatus: 'ASSIGNED',
+          changedBy: userId,
+          reason: reason || 'Chuyển Lead cho Sale khác phụ trách.',
+          note: `Chuyển giao từ ${currentUserObj ? currentUserObj.fullName : 'Sale cũ'} sang ${targetUser ? targetUser.fullName : 'Sale mới'}.`
+        });
+        
+        await lead.populate('assignedTo', 'fullName email phone');
+      } else {
+        return res.status(400).json({ success: false, message: 'actionType không hợp lệ (RELEASE hoặc REASSIGN)' });
+      }
+      
+      return res.status(200).json({ success: true, message: 'Thao tác thành công', data: lead });
     } catch (error) {
       return res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
     }
@@ -293,7 +421,20 @@ const leadController = {
       const lead = await CourseLead.findById(leadId);
       
       if (!lead) return res.status(404).json({ success: false, message: 'Lead không tồn tại' });
-      if (lead.assignedTo?.toString() !== userId) return res.status(403).json({ success: false, message: 'Bạn không phụ trách Lead này' });
+      
+      const User = require('../models/User');
+      const currentUserObj = await User.findById(userId).populate('roleId');
+      let hasAdminOverride = false;
+      if (currentUserObj) {
+        const roleKey = String(currentUserObj.roleId?.name || "").trim().toLowerCase();
+        const perms = [...(currentUserObj.roleId?.permissions || []), ...(currentUserObj.grantedPermissions || [])];
+        hasAdminOverride = roleKey === 'admin' || currentUserObj.roleId?._id?.toString() === "69fc5af582ef85451120772a" || perms.includes('*');
+      }
+
+      if (lead.assignedTo?.toString() !== userId && !hasAdminOverride) {
+        return res.status(403).json({ success: false, message: 'Bạn không phụ trách Lead này' });
+      }
+      
       if (lead.status !== 'ASSIGNED') return res.status(400).json({ success: false, message: 'Trạng thái không hợp lệ' });
       
       lead.status = 'PROCESSING';
@@ -308,6 +449,7 @@ const leadController = {
         changedBy: userId,
         reason: 'Sale bắt đầu liên hệ khách hàng'
       });
+      await lead.populate('assignedTo', 'fullName email phone');
       
       return res.status(200).json({ success: true, message: 'Cập nhật trạng thái thành công', data: lead });
     } catch (error) {
@@ -320,10 +462,31 @@ const leadController = {
     try {
       const leadId = req.params.id;
       const userId = req.user?.sub;
-      const { proofFiles } = req.body;
+      const note = req.body.note || '';
       
       if (!userId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
-      if (!proofFiles || !Array.isArray(proofFiles) || proofFiles.length === 0) {
+
+      let finalProofFiles = [];
+
+      // Xử lý upload file lên Google Drive nếu có
+      if (req.file) {
+        const GoogleDriveService = require('../services/googleDrive.service');
+        const driveService = new GoogleDriveService();
+        const uploadResult = await driveService.uploadFile(req.file);
+        // Lưu mảng chứa webViewLink hoặc ID của file
+        finalProofFiles = [uploadResult.webViewLink || uploadResult.id];
+      } else if (req.body.proofFiles) {
+        // Fallback: nếu gọi bằng API cũ (danh sách link text)
+        let parsed = req.body.proofFiles;
+        if (typeof parsed === 'string') {
+          try { parsed = JSON.parse(parsed); } catch(e) { parsed = [parsed]; }
+        }
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          finalProofFiles = parsed;
+        }
+      }
+
+      if (finalProofFiles.length === 0) {
         return res.status(400).json({ success: false, message: 'Vui lòng cung cấp ít nhất một minh chứng' });
       }
 
@@ -331,14 +494,27 @@ const leadController = {
       const lead = await CourseLead.findById(leadId);
       
       if (!lead) return res.status(404).json({ success: false, message: 'Lead không tồn tại' });
-      if (lead.assignedTo?.toString() !== userId) return res.status(403).json({ success: false, message: 'Bạn không phụ trách Lead này' });
+      
+      const User = require('../models/User');
+      const currentUserObj = await User.findById(userId).populate('roleId');
+      let hasAdminOverride = false;
+      if (currentUserObj) {
+        const roleKey = String(currentUserObj.roleId?.name || "").trim().toLowerCase();
+        const perms = [...(currentUserObj.roleId?.permissions || []), ...(currentUserObj.grantedPermissions || [])];
+        hasAdminOverride = roleKey === 'admin' || currentUserObj.roleId?._id?.toString() === "69fc5af582ef85451120772a" || perms.includes('*');
+      }
+
+      if (lead.assignedTo?.toString() !== userId && !hasAdminOverride) {
+        return res.status(403).json({ success: false, message: 'Bạn không phụ trách Lead này' });
+      }
+      
       if (lead.status !== 'PROCESSING' && lead.status !== 'COMPLETED_PENDING_PROOF') {
         return res.status(400).json({ success: false, message: 'Trạng thái không hợp lệ để gửi minh chứng' });
       }
       
       lead.status = 'COMPLETED_PENDING_PROOF';
       lead.proofStatus = 'PENDING';
-      lead.proofFiles = proofFiles;
+      lead.proofFiles = finalProofFiles;
       await lead.save();
       
       await require('../models/courseLeadHistory.model').create({
@@ -346,12 +522,13 @@ const leadController = {
         fromStatus: 'PROCESSING',
         toStatus: 'COMPLETED_PENDING_PROOF',
         changedBy: userId,
-        reason: 'Sale gửi minh chứng'
+        reason: `Sale gửi minh chứng. Ghi chú: ${note}`
       });
       
       return res.status(200).json({ success: true, message: 'Gửi minh chứng thành công', data: lead });
     } catch (error) {
-      return res.status(500).json({ success: false, message: 'Lỗi máy chủ' });
+      console.error('Lỗi khi gửi minh chứng:', error);
+      return res.status(500).json({ success: false, message: 'Lỗi máy chủ', error: error.message });
     }
   },
 
@@ -498,37 +675,56 @@ const leadController = {
   permanentDeleteLead: async (req, res) => {
     try {
       const { id } = req.params;
-      const { force } = req.query;
       const userId = req.user?.sub;
-      
-      // Chỉ Admin mới được xoá
-      if (req.user?.role !== 'admin') {
-        return res.status(403).json({ success: false, message: 'Chỉ Admin mới có quyền xóa vĩnh viễn dữ liệu' });
+
+      console.log('=== DEBUG DELETE SINGLE ===');
+      console.log('req.params.id:', id);
+      console.log('req.user.id:', userId);
+      console.log('req.user.role:', req.user?.roleId);
+
+      const mongoose = require('mongoose');
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        console.log('Invalid ID');
+        return res.status(400).json({ success: false, message: 'ID không hợp lệ' });
       }
 
       const CourseLead = require('../models/courseLead.model');
       const lead = await CourseLead.findById(id);
+      console.log('MongoDB find result:', lead ? 'Found' : 'Not Found');
       if (!lead) return res.status(404).json({ success: false, message: 'Không tìm thấy Lead' });
 
-      // KPI Lock
-      if (lead.status === 'COMPLETED' && lead.proofStatus === 'APPROVED' && force !== 'true') {
-        return res.status(400).json({ 
+      console.log('KPI status:', lead.status);
+      console.log('proofStatus:', lead.proofStatus);
+
+      // KPI Lock - Không cho phép xoá vĩnh viễn dù có force hay không (theo yêu cầu mới)
+      if (lead.status === 'COMPLETED' && lead.proofStatus === 'APPROVED') {
+        console.log('KPI Blocked');
+        return res.status(409).json({ 
           success: false, 
-          message: 'Lead này đã được tính KPI. Bạn không nên xóa vĩnh viễn để tránh sai lệch báo cáo. Vui lòng Archive hoặc truyền force=true nếu thực sự muốn xóa.',
-          requireForce: true
+          code: 'KPI_PROTECTED',
+          message: 'Lead đã được duyệt KPI và không thể xóa vĩnh viễn. Vui lòng sử dụng Archive.'
         });
       }
 
-      await CourseLead.findByIdAndDelete(id);
+      const deleteRes = await CourseLead.findByIdAndDelete(id);
+      console.log('Delete result:', deleteRes ? 'Success' : 'Failed');
 
-      // Lưu log vào hệ thống nếu cần, hoặc tạo History mồ côi
-      await require('../models/courseLeadHistory.model').create({
-        leadId: id,
-        fromStatus: lead.status,
-        toStatus: 'DELETED',
-        changedBy: userId,
-        reason: 'XÓA VĨNH VIỄN KHỎI HỆ THỐNG'
-      });
+      const CourseLeadAudit = require('../models/courseLeadAudit.model');
+      try {
+        const auditDoc = await CourseLeadAudit.create({
+          leadId: id,
+          customerName: lead.fullName,
+          phoneNumber: lead.phone,
+          courseId: lead.courseId,
+          previousStatus: lead.status,
+          previousProofStatus: lead.proofStatus,
+          deletedBy: userId,
+          reason: 'Xóa vĩnh viễn'
+        });
+        console.log('Audit insert result:', auditDoc ? 'Success' : 'Failed');
+      } catch (auditErr) {
+        console.error('Audit insert error:', auditErr);
+      }
 
       return res.status(200).json({ success: true, message: 'Đã xóa vĩnh viễn Lead' });
     } catch (err) {
@@ -538,19 +734,26 @@ const leadController = {
 
   bulkArchive: async (req, res) => {
     try {
-      const { ids, reason } = req.body;
+      const { ids, reason } = req.body || {};
       const userId = req.user?.sub;
       if (!ids || !Array.isArray(ids)) return res.status(400).json({ success: false, message: 'Danh sách ID không hợp lệ' });
 
+      const mongoose = require('mongoose');
+      const validIds = ids.filter(id => mongoose.Types.ObjectId.isValid(id));
+
+      if (validIds.length === 0) {
+        return res.status(400).json({ success: false, message: 'Không có ID nào hợp lệ' });
+      }
+
       const CourseLead = require('../models/courseLead.model');
       await CourseLead.updateMany(
-        { _id: { $in: ids } },
+        { _id: { $in: validIds } },
         { $set: { isArchived: true, archivedAt: new Date(), archivedBy: userId, archiveReason: reason || 'Lưu trữ hàng loạt' } }
       );
 
       // Thêm history cho từng lead
       const CourseLeadHistory = require('../models/courseLeadHistory.model');
-      const historyDocs = ids.map(id => ({
+      const historyDocs = validIds.map(id => ({
         leadId: id,
         fromStatus: 'UNKNOWN',
         toStatus: 'UNKNOWN',
@@ -559,7 +762,42 @@ const leadController = {
       }));
       await CourseLeadHistory.insertMany(historyDocs);
 
-      return res.status(200).json({ success: true, message: `Đã lưu trữ ${ids.length} Lead` });
+      return res.status(200).json({ success: true, message: `Đã lưu trữ ${validIds.length} Lead` });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: 'Lỗi máy chủ', error: err.message });
+    }
+  },
+
+  bulkRestore: async (req, res) => {
+    try {
+      const { ids } = req.body || {};
+      const userId = req.user?.sub;
+      if (!ids || !Array.isArray(ids)) return res.status(400).json({ success: false, message: 'Danh sách ID không hợp lệ' });
+
+      const mongoose = require('mongoose');
+      const validIds = ids.filter(id => mongoose.Types.ObjectId.isValid(id));
+
+      if (validIds.length === 0) {
+        return res.status(400).json({ success: false, message: 'Không có ID nào hợp lệ' });
+      }
+
+      const CourseLead = require('../models/courseLead.model');
+      await CourseLead.updateMany(
+        { _id: { $in: validIds } },
+        { $set: { isArchived: false, archivedAt: null, archivedBy: null, archiveReason: '' } }
+      );
+
+      const CourseLeadHistory = require('../models/courseLeadHistory.model');
+      const historyDocs = validIds.map(id => ({
+        leadId: id,
+        fromStatus: 'UNKNOWN',
+        toStatus: 'UNKNOWN',
+        changedBy: userId,
+        reason: 'Khôi phục hàng loạt từ danh sách lưu trữ'
+      }));
+      await CourseLeadHistory.insertMany(historyDocs);
+
+      return res.status(200).json({ success: true, message: `Đã khôi phục ${validIds.length} Lead` });
     } catch (err) {
       return res.status(500).json({ success: false, message: 'Lỗi máy chủ', error: err.message });
     }
@@ -567,49 +805,112 @@ const leadController = {
 
   bulkPermanentDelete: async (req, res) => {
     try {
-      const { ids, force } = req.body;
+      const { ids } = req.body || {};
       const userId = req.user?.sub;
       
-      if (req.user?.role !== 'admin') {
-        return res.status(403).json({ success: false, message: 'Chỉ Admin mới có quyền xóa vĩnh viễn dữ liệu' });
-      }
+      console.log('=== DEBUG DELETE BULK ===');
+      console.log('req.body:', req.body);
+      console.log('leadIds:', ids);
+      
       if (!ids || !Array.isArray(ids)) return res.status(400).json({ success: false, message: 'Danh sách ID không hợp lệ' });
 
-      const CourseLead = require('../models/courseLead.model');
+      const mongoose = require('mongoose');
+      const validIds = ids.filter(id => mongoose.Types.ObjectId.isValid(id));
+      const invalidIds = ids.filter(id => !mongoose.Types.ObjectId.isValid(id));
       
-      if (force !== true) {
-        // Kiểm tra xem có KPI lock không
-        const kpiLeads = await CourseLead.countDocuments({
-          _id: { $in: ids },
-          status: 'COMPLETED',
-          proofStatus: 'APPROVED'
-        });
-        if (kpiLeads > 0) {
-          return res.status(400).json({ 
-            success: false, 
-            message: `Có ${kpiLeads} Lead đã được duyệt KPI trong số đang chọn. Vui lòng Archive hoặc chọn Bỏ qua cảnh báo KPI (Force).`,
-            requireForce: true
+      console.log('validIds:', validIds);
+      console.log('invalidIds:', invalidIds);
+
+      const CourseLead = require('../models/courseLead.model');
+      const CourseLeadAudit = require('../models/courseLeadAudit.model');
+      
+      const leads = await CourseLead.find({ _id: { $in: validIds } });
+      const foundIds = leads.map(l => l._id.toString());
+      
+      const notFoundIds = validIds.filter(id => !foundIds.includes(id));
+      
+      console.log('foundIds:', foundIds);
+      console.log('notFoundIds:', notFoundIds);
+      
+      const results = [];
+      const idsToDelete = [];
+      const auditDocs = [];
+      
+      let deletedCount = 0;
+      let failedCount = 0;
+
+      // Xử lý invalid ids
+      invalidIds.forEach(id => {
+        failedCount++;
+        results.push({ leadId: id, success: false, action: 'ERROR', message: 'ID không hợp lệ' });
+      });
+
+      // Xử lý not found ids
+      notFoundIds.forEach(id => {
+        failedCount++;
+        results.push({ leadId: id, success: false, action: 'NOT_FOUND', message: 'Không tìm thấy Lead' });
+      });
+
+      // Xử lý leads tìm thấy
+      const kpiBlockedIds = [];
+      leads.forEach(lead => {
+        if (lead.status === 'COMPLETED' && lead.proofStatus === 'APPROVED') {
+          kpiBlockedIds.push(lead._id.toString());
+          failedCount++;
+          results.push({
+            leadId: lead._id.toString(),
+            success: false,
+            action: 'BLOCKED',
+            code: 'KPI_PROTECTED',
+            message: 'Lead đã được duyệt KPI.'
           });
+        } else {
+          deletedCount++;
+          idsToDelete.push(lead._id);
+          results.push({
+            leadId: lead._id.toString(),
+            success: true,
+            action: 'DELETED'
+          });
+          
+          auditDocs.push({
+            leadId: lead._id,
+            customerName: lead.fullName,
+            phoneNumber: lead.phone,
+            courseId: lead.courseId,
+            previousStatus: lead.status,
+            previousProofStatus: lead.proofStatus,
+            deletedBy: userId,
+            reason: 'Xóa vĩnh viễn hàng loạt'
+          });
+        }
+      });
+
+      console.log('KPI blocked IDs:', kpiBlockedIds);
+      console.log('IDs eligible for delete:', idsToDelete);
+
+      if (idsToDelete.length > 0) {
+        const delRes = await CourseLead.deleteMany({ _id: { $in: idsToDelete } });
+        console.log('delete result:', delRes);
+        try {
+          const auditRes = await CourseLeadAudit.insertMany(auditDocs);
+          console.log('Audit insert result: Success', auditRes.length);
+        } catch (err) {
+          console.log('Audit insert result: Failed', err);
         }
       }
 
-      await CourseLead.deleteMany({ _id: { $in: ids } });
-
-      const CourseLeadHistory = require('../models/courseLeadHistory.model');
-      const historyDocs = ids.map(id => ({
-        leadId: id,
-        fromStatus: 'UNKNOWN',
-        toStatus: 'DELETED',
-        changedBy: userId,
-        reason: 'XÓA VĨNH VIỄN HÀNG LOẠT'
-      }));
-      await CourseLeadHistory.insertMany(historyDocs);
-
-      return res.status(200).json({ success: true, message: `Đã xóa vĩnh viễn ${ids.length} Lead` });
+      return res.status(200).json({
+        success: failedCount === 0,
+        deletedCount,
+        failedCount,
+        results
+      });
     } catch (err) {
       return res.status(500).json({ success: false, message: 'Lỗi máy chủ', error: err.message });
     }
-  }
+  },
+
 };
 
 module.exports = leadController;

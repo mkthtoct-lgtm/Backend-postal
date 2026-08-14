@@ -83,10 +83,11 @@ class ProductController {
       if (req.file) {
         try {
           const driveResult = await googleDriveService.uploadFile(req.file);
-          if (driveResult && driveResult.webViewLink) {
-            data.image = driveResult.webViewLink;
+          if (driveResult && driveResult.fileId) {
             data.imageFileId = driveResult.fileId;
             data.imageMimeType = req.file.mimetype;
+            // Xóa image cũ (nếu có) để FE ưu tiên dùng imageFileId
+            data.image = '';
           }
         } catch (uploadError) {
           console.error("Lỗi đẩy ảnh sản phẩm lên Drive:", uploadError);
@@ -168,10 +169,10 @@ class ProductController {
       if (req.file) {
         try {
           const driveResult = await googleDriveService.uploadFile(req.file);
-          if (driveResult && driveResult.webViewLink) {
-            data.image = driveResult.webViewLink;
+          if (driveResult && driveResult.fileId) {
             data.imageFileId = driveResult.fileId;
             data.imageMimeType = req.file.mimetype;
+            data.image = ''; // Xóa URL cũ để ưu tiên imageFileId
             
             // Xóa ảnh cũ trên Drive nếu có
             if (existingProduct.imageFileId) {

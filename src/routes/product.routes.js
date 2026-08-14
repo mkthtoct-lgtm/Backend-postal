@@ -78,7 +78,7 @@ const markManagerMiddleware = async (req, res, next) => {
  *       401:
  *         description: Chưa đăng nhập hoặc token không hợp lệ
  */
-router.get('/', authMiddleware, markManagerMiddleware, (req, res, next) => {
+router.get('/', authMiddleware, checkPermission('dao_tao.view'), markManagerMiddleware, (req, res, next) => {
   // Manager thấy tất cả sản phẩm kể cả đã ẩn
   // User thường chỉ thấy sản phẩm đang active
   if (!req.isManager && req.query.isActive === undefined) {
@@ -87,7 +87,7 @@ router.get('/', authMiddleware, markManagerMiddleware, (req, res, next) => {
   next();
 }, productController.getAll);
 
-router.get('/:id', authMiddleware, markManagerMiddleware, (req, res, next) => {
+router.get('/:id', authMiddleware, checkPermission('dao_tao.view'), markManagerMiddleware, (req, res, next) => {
   if (!req.isManager) {
     req.query._restrictHidden = 'true';
   }
@@ -98,7 +98,7 @@ router.get('/:id', authMiddleware, markManagerMiddleware, (req, res, next) => {
  * @swagger
  * /products:
  *   post:
- *     summary: Tạo sản phẩm mới (Chỉ Admin)
+ *     summary: Tạo sản phẩm mới (Yêu cầu quyền dao_tao.create)
  *     tags: [Products]
  *     security:
  *       - BearerAuth: []
@@ -138,15 +138,69 @@ router.get('/:id', authMiddleware, markManagerMiddleware, (req, res, next) => {
  *       401:
  *         description: Chưa đăng nhập
  *       403:
- *         description: Không có quyền truy cập (Không phải Admin)
+ *         description: Không có quyền truy cập
  */
-router.post('/', authMiddleware, checkPermission('products:write'), upload.single('image'), productController.create);
+
+// Middleware kiểm tra quyền upload ảnh
+const checkUploadPermission = async (req, res, next) => {
+  if (!req.file) return next();
+  
+  try {
+    const Role = require('../models/Role');
+    const role = await Role.findById(req.user.roleId);
+    
+    // expandPermissions logic
+    const PERMISSION_ALIASES = {
+      'documents:view': 'documents:read',
+      'documents:upload': 'documents:write',
+      'documents:edit': 'documents:write',
+      'documents:delete': 'documents:write',
+      'notifications:view': 'notifications:read',
+      'notifications:create': 'notifications:write',
+      'users:view': 'users:read',
+      'users:edit': 'users:write',
+      'users:lock': 'users:write',
+    };
+    const expandPermissions = (permissions = []) => {
+      const expanded = new Set();
+      permissions.filter(Boolean).forEach((p) => {
+        expanded.add(p);
+        if (PERMISSION_ALIASES[p]) expanded.add(PERMISSION_ALIASES[p]);
+      });
+      return Array.from(expanded);
+    };
+
+    const effectivePermissions = expandPermissions([
+      ...(Array.isArray(role?.permissions) ? role.permissions : []),
+      ...(Array.isArray(req.user.grantedPermissions) ? req.user.grantedPermissions : []),
+    ]);
+
+    if (effectivePermissions.includes('*') || effectivePermissions.includes('dao_tao.upload_image')) {
+      return next();
+    }
+    
+    // Cleanup the uploaded file from temp local storage if denied
+    const fs = require('fs');
+    if (req.file.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    return res.status(403).json({
+      success: false,
+      message: 'Bạn không có quyền upload ảnh (Yêu cầu quyền: [dao_tao.upload_image]).',
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+router.post('/', authMiddleware, checkPermission('dao_tao.create'), upload.single('image'), checkUploadPermission, productController.create);
 
 /**
  * @swagger
  * /products/{id}:
  *   patch:
- *     summary: Cập nhật thông tin sản phẩm (Chỉ Admin)
+ *     summary: Cập nhật thông tin sản phẩm (Yêu cầu quyền dao_tao.update)
  *     tags: [Products]
  *     security:
  *       - BearerAuth: []
@@ -185,13 +239,13 @@ router.post('/', authMiddleware, checkPermission('products:write'), upload.singl
  *       404:
  *         description: Không tìm thấy sản phẩm
  */
-router.patch('/:id', authMiddleware, checkPermission('products:write'), upload.single('image'), productController.update);
+router.patch('/:id', authMiddleware, checkPermission('dao_tao.update'), upload.single('image'), checkUploadPermission, productController.update);
 
 /**
  * @swagger
  * /products/{id}:
  *   delete:
- *     summary: Xóa mềm sản phẩm khỏi hệ thống (Chỉ Admin)
+ *     summary: Xóa mềm sản phẩm khỏi hệ thống (Yêu cầu quyền dao_tao.delete)
  *     tags: [Products]
  *     security:
  *       - BearerAuth: []
@@ -212,7 +266,7 @@ router.patch('/:id', authMiddleware, checkPermission('products:write'), upload.s
  *       404:
  *         description: Không tìm thấy sản phẩm
  */
-router.delete('/:id', authMiddleware, checkPermission('products:write'), productController.delete);
+router.delete('/:id', authMiddleware, checkPermission('dao_tao.delete'), productController.delete);
 
 /**
  * @swagger

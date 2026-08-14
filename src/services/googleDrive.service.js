@@ -241,6 +241,27 @@ class GoogleDriveService {
       console.error(`Lỗi hệ thống khi xóa file (${fileId}) trên Google Drive:`, error.message);
     }
   }
+
+  /**
+   * Lấy stream file nhị phân từ Google Drive
+   * @param {string} fileId - ID của file trên Google Drive
+   * @returns {Promise<ReadableStream>} - Stream nhị phân
+   */
+  async getFileStream(fileId) {
+    try {
+      if (!drive) {
+        throw new Error('Google Drive API client chưa được khởi tạo thành công.');
+      }
+      const response = await drive.files.get(
+        { fileId, alt: 'media' },
+        { responseType: 'stream' }
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Lỗi hệ thống khi lấy luồng file (${fileId}) trên Google Drive:`, error.message);
+      throw error;
+    }
+  }
 }
 
 module.exports = new GoogleDriveService();
