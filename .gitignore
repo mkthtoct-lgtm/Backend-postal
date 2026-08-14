@@ -8,3 +8,6 @@ yarn-error.log
 coverage
 dist
 EOF
+#uploads/
+#response.json
+#*.log
