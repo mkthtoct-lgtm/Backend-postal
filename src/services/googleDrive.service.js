@@ -112,7 +112,7 @@ class GoogleDriveService {
 
       return {
         fileId: fileId,
-        webViewLink: response.data.webViewLink
+        webViewLink: `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`
       };
     } catch (error) {
       console.error('Lỗi hệ thống khi tải file lên Google Drive:', error);
@@ -222,6 +222,44 @@ class GoogleDriveService {
       });
     } catch (error) {
       console.error(`Lỗi hệ thống khi đổi tên thư mục (${folderId}) trên Google Drive:`, error);
+    }
+  }
+
+  /**
+   * Xóa file trên Google Drive theo ID
+   */
+  async deleteFile(fileId) {
+    try {
+      if (!drive) {
+        throw new Error('Google Drive API client chưa được khởi tạo thành công.');
+      }
+      if (!fileId) return;
+
+      await drive.files.delete({ fileId });
+      console.log(`[GoogleDriveService] Đã xóa file cũ trên Drive: ${fileId}`);
+    } catch (error) {
+      console.error(`Lỗi hệ thống khi xóa file (${fileId}) trên Google Drive:`, error.message);
+    }
+  }
+
+  /**
+   * Lấy stream file nhị phân từ Google Drive
+   * @param {string} fileId - ID của file trên Google Drive
+   * @returns {Promise<ReadableStream>} - Stream nhị phân
+   */
+  async getFileStream(fileId) {
+    try {
+      if (!drive) {
+        throw new Error('Google Drive API client chưa được khởi tạo thành công.');
+      }
+      const response = await drive.files.get(
+        { fileId, alt: 'media' },
+        { responseType: 'stream' }
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Lỗi hệ thống khi lấy luồng file (${fileId}) trên Google Drive:`, error.message);
+      throw error;
     }
   }
 }

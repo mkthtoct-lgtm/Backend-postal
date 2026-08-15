@@ -15,20 +15,31 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    // Tạo tên file duy nhất: [Timestamp]-[Random 9 chữ số]-[Tên gốc đã lọc ký tự đặc biệt]
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    // Chuẩn hóa tên file để tránh các lỗi encode tiếng Việt hoặc ký tự lạ trên hệ điều hành
     const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
     cb(null, `${uniqueSuffix}-${safeName}`);
   }
 });
 
-// Cấu hình giới hạn kích thước file (tối đa 50MB) và lọc định dạng
+// Cấu hình upload cho Image (tối đa 50MB) - Global default
 const upload = multer({
   storage: storage,
-  limits: {
-    fileSize: 50 * 1024 * 1024 // 50 Megabytes
-  }
+  limits: { fileSize: 50 * 1024 * 1024 }
+});
+
+// Cấu hình upload cho Document (tối đa 50MB)
+const uploadDocument = multer({
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 }
+});
+
+// Cấu hình upload cho Video (tối đa 1GB)
+const uploadVideo = multer({
+  storage: storage,
+  limits: { fileSize: 1024 * 1024 * 1024 }
 });
 
 module.exports = upload;
+module.exports.uploadImage = upload;
+module.exports.uploadDocument = uploadDocument;
+module.exports.uploadVideo = uploadVideo;

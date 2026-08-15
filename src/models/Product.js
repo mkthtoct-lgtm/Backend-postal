@@ -158,6 +158,18 @@ const productSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    // Google Drive File ID (nếu ảnh được upload qua Google Drive)
+    imageFileId: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    // MimeType gốc của file trên Google Drive
+    imageMimeType: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     // Xóa mềm: giữ lại để tương thích với code mới, null = chưa xóa
     deletedAt: {
       type: Date,

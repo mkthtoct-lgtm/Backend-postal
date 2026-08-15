@@ -10,14 +10,26 @@ const PERMISSION_ALIASES = {
   'users:view': 'users:read',
   'users:edit': 'users:write',
   'users:lock': 'users:write',
+  // Backward compatibility for products/leads
+  'products:read': 'dao_tao.view',
+  'products:write': ['dao_tao.create', 'dao_tao.update', 'dao_tao.delete', 'dao_tao.upload_image'],
+  'leads:read': 'crm.course_leads.view',
+  'leads:write': ['crm.course_leads.assign', 'crm.course_leads.process', 'crm.course_leads.release', 'crm.course_leads.submit_proof', 'crm.course_leads.archive', 'crm.course_leads.restore'],
+  'media:read': 'media.read',
+  'media:write': ['media.write', 'media.create', 'media.update', 'media.delete'],
 };
 
 const expandPermissions = (permissions = []) => {
   const expanded = new Set();
   permissions.filter(Boolean).forEach((permission) => {
     expanded.add(permission);
-    if (PERMISSION_ALIASES[permission]) {
-      expanded.add(PERMISSION_ALIASES[permission]);
+    const aliases = PERMISSION_ALIASES[permission];
+    if (aliases) {
+      if (Array.isArray(aliases)) {
+        aliases.forEach(alias => expanded.add(alias));
+      } else {
+        expanded.add(aliases);
+      }
     }
   });
   return Array.from(expanded);
@@ -60,6 +72,8 @@ const checkPermission = (requiredPermission) => {
         ...(Array.isArray(role.permissions) ? role.permissions : []),
         ...(Array.isArray(user.grantedPermissions) ? user.grantedPermissions : []),
       ]);
+      
+      req.user.effectivePermissions = effectivePermissions;
 
       // Admin có quyền wildcard '*' hoặc vai trò/user có chứa cụ thể quyền yêu cầu
       const hasWildcard = effectivePermissions.includes('*');
