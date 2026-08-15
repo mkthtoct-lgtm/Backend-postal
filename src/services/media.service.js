@@ -28,7 +28,7 @@ class MediaService {
   /**
    * Lấy danh sách Media có phân trang và lọc
    */
-  async findMedias(query = {}) {
+  async findMedias(query = {}, canWrite = false) {
     const { search, category, country, page = 1, limit = 10 } = query;
     
     const filter = {};
@@ -55,11 +55,15 @@ class MediaService {
       Media.countDocuments(filter)
     ]);
 
-    // Format lại dữ liệu: che tên customer_name
-    const formattedMedias = medias.map(media => ({
-      ...media,
-      customer_name: this.maskCustomerName(media.customer_name)
-    }));
+    // Format lại dữ liệu: che tên customer_name và ẩn tên thật nếu không có quyền
+    const formattedMedias = medias.map(media => {
+      const maskedName = this.maskCustomerName(media.customer_name);
+      return {
+        ...media,
+        customer_name_masked: maskedName,
+        customer_name: canWrite ? media.customer_name : ''
+      };
+    });
 
     return {
       medias: formattedMedias,
@@ -75,10 +79,13 @@ class MediaService {
   /**
    * Lấy chi tiết một media
    */
-  async findById(id) {
+  async findById(id, canWrite = false) {
     const media = await Media.findById(id).lean();
     if (media) {
-      media.customer_name = this.maskCustomerName(media.customer_name);
+      media.customer_name_masked = this.maskCustomerName(media.customer_name);
+      if (!canWrite) {
+        media.customer_name = '';
+      }
     }
     return media;
   }

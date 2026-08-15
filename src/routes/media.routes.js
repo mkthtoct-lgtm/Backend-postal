@@ -2,21 +2,38 @@ const express = require('express');
 const router = express.Router();
 const mediaController = require('../controllers/media.controller');
 const upload = require('../middlewares/upload');
-const { authMiddleware, checkPermission } = require('../middlewares/auth');
+const authMiddleware = require('../middlewares/auth');
+const checkPermission = require('../middlewares/checkPermission');
+
+// Áp dụng authMiddleware cho tất cả các route của Media
+router.use(authMiddleware);
 
 // Lấy danh sách Media (có phân trang & lọc)
-router.get('/', mediaController.getAll);
+router.get('/', checkPermission('media.read'), mediaController.getAll);
 
 // Lấy chi tiết Media
-router.get('/:id', mediaController.getById);
+router.get('/:id', checkPermission('media.read'), mediaController.getById);
 
-// Thêm mới Media
-router.post('/', upload.single('thumbnail'), mediaController.create);
+// Download/Preview tài liệu hoặc ảnh
+router.get('/:id/download', checkPermission('media.read'), mediaController.download);
 
-// Cập nhật Media
-router.put('/:id', upload.single('thumbnail'), mediaController.update);
+// --- CREATE ROUTES ---
+// Image (Default)
+router.post('/', checkPermission('media.create'), upload.uploadImage.single('thumbnail'), mediaController.create);
+// Document
+router.post('/document', checkPermission('media.create'), upload.uploadDocument.single('thumbnail'), mediaController.create);
+// Video
+router.post('/video', checkPermission('media.create'), upload.uploadVideo.single('thumbnail'), mediaController.create);
+
+// --- UPDATE ROUTES ---
+// Image (Default)
+router.put('/:id', checkPermission('media.update'), upload.uploadImage.single('thumbnail'), mediaController.update);
+// Document
+router.put('/document/:id', checkPermission('media.update'), upload.uploadDocument.single('thumbnail'), mediaController.update);
+// Video
+router.put('/video/:id', checkPermission('media.update'), upload.uploadVideo.single('thumbnail'), mediaController.update);
 
 // Xóa Media
-router.delete('/:id', mediaController.delete);
+router.delete('/:id', checkPermission('media.delete'), mediaController.delete);
 
 module.exports = router;
