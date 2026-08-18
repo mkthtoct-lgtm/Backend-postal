@@ -1,4 +1,4 @@
-const Media = require('../../src/models/Media');
+const Media = require('../../../src/models/Media');
 
 async function runTest() {
   console.log('--- BẮT ĐẦU TEST mediaBackwardCompatibility.test.js ---');

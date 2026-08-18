@@ -29,7 +29,13 @@ class MediaService {
    * Lấy danh sách Media có phân trang và lọc
    */
   async findMedias(query = {}, canWrite = false) {
-    const { search, category, country, page = 1, limit = 10 } = query;
+    const { 
+      search, category, country, 
+      storageProvider, storageOwnership, sourceType, 
+      videoType, videoPurpose, documentType, 
+      visa_result_status, createdFrom, createdTo,
+      page = 1, limit = 10 
+    } = query;
     
     const filter = {};
     
@@ -41,6 +47,36 @@ class MediaService {
     }
     if (country && country !== 'All') {
       filter.country_tag = country;
+    }
+    if (storageProvider && storageProvider !== 'All') {
+      filter.storageProvider = storageProvider;
+    }
+    if (storageOwnership && storageOwnership !== 'All') {
+      filter.storageOwnership = storageOwnership;
+    }
+    if (sourceType && sourceType !== 'All') {
+      filter.sourceType = sourceType;
+    }
+    if (videoType && videoType !== 'All') {
+      filter.videoType = videoType;
+    }
+    if (videoPurpose && videoPurpose !== 'All') {
+      filter.videoPurpose = videoPurpose;
+    }
+    if (documentType && documentType !== 'All') {
+      filter.documentType = documentType;
+    }
+    if (visa_result_status && visa_result_status !== 'All') {
+      filter.visa_result_status = visa_result_status;
+    }
+    if (createdFrom || createdTo) {
+      filter.createdAt = {};
+      if (createdFrom) filter.createdAt.$gte = new Date(createdFrom);
+      if (createdTo) {
+        const toDate = new Date(createdTo);
+        toDate.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = toDate;
+      }
     }
 
     const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
