@@ -96,7 +96,7 @@ class GoogleDriveService {
       const response = await drive.files.create({
         requestBody: fileMetadata,
         media: media,
-        fields: 'id, webViewLink'
+        fields: 'id, webViewLink, thumbnailLink, mimeType, size'
       });
 
       const fileId = response.data.id;
@@ -112,7 +112,10 @@ class GoogleDriveService {
 
       return {
         fileId: fileId,
-        webViewLink: `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`
+        webViewLink: response.data.webViewLink || `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`,
+        thumbnailLink: response.data.thumbnailLink || null,
+        mimeType: response.data.mimeType,
+        size: response.data.size ? parseInt(response.data.size, 10) : file.size
       };
     } catch (error) {
       console.error('Lỗi hệ thống khi tải file lên Google Drive:', error);
@@ -256,9 +259,41 @@ class GoogleDriveService {
         { fileId, alt: 'media' },
         { responseType: 'stream' }
       );
-      return response.data;
+      return {
+        stream: response.data,
+        status: response.status,
+        headers: response.headers
+      };
     } catch (error) {
       console.error(`Lỗi hệ thống khi lấy luồng file (${fileId}) trên Google Drive:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Lấy stream file nhị phân từ Google Drive có hỗ trợ Range header
+   * @param {string} fileId - ID của file trên Google Drive
+   * @param {string} rangeHeader - Header Range (vd: bytes=0-1024)
+   */
+  async getFileStreamWithRange(fileId, rangeHeader) {
+    try {
+      if (!drive) {
+        throw new Error('Google Drive API client chưa được khởi tạo thành công.');
+      }
+      const options = { fileId, alt: 'media' };
+      const config = { responseType: 'stream' };
+      if (rangeHeader) {
+        config.headers = { Range: rangeHeader };
+      }
+      
+      const response = await drive.files.get(options, config);
+      return {
+        stream: response.data,
+        status: response.status,
+        headers: response.headers
+      };
+    } catch (error) {
+      console.error(`Lỗi hệ thống khi lấy luồng file (${fileId}) có Range trên Google Drive:`, error.message);
       throw error;
     }
   }

@@ -114,6 +114,32 @@ const mediaSchema = new mongoose.Schema(
       type: String,
       enum: ['pending', 'processing', 'completed', 'failed'],
       default: 'completed',
+    },
+    // ---- MEDIA REPOSITORY V3.2 TAXONOMY & STORAGE RULES ----
+    videoType: {
+      type: String,
+      enum: ['Quảng bá thương hiệu', 'Du học', 'Visa', 'Điểm đến / Du lịch', 'Trường / Đối tác', 'Chương trình học', 'Học bổng', 'Đời sống du học sinh', 'Testimonial / Câu chuyện khách hàng', 'Hướng dẫn / How-to', 'Sự kiện / Webinar', 'Tin tức', 'Marketing / Campaign', 'Social Media', 'Đào tạo nội bộ', 'Khác', ''],
+      default: '',
+    },
+    videoPurpose: {
+      type: String,
+      enum: ['Website', 'YouTube', 'Facebook', 'TikTok', 'Zalo', 'Presentation', 'Advertising', 'Internal Training', 'Khác', ''],
+      default: '',
+    },
+    documentType: {
+      type: String,
+      enum: ['Brochure', 'Catalogue', 'Flyer', 'Poster', 'Infographic', 'Ấn phẩm Marketing', 'Tài liệu giới thiệu dịch vụ', 'Tài liệu giới thiệu chương trình', 'Tài liệu theo quốc gia / điểm đến', 'Tài liệu sự kiện', 'Website Materials', 'PR / Truyền thông', 'Campaign Material', 'Social Media Material', 'Khác', ''],
+      default: '',
+    },
+    sourceType: {
+      type: String,
+      enum: ['UPLOAD', 'EXTERNAL_LINK'],
+      default: 'UPLOAD',
+    },
+    storageOwnership: {
+      type: String,
+      enum: ['MANAGED', 'EXTERNAL'],
+      default: 'MANAGED',
     }
   },
   {

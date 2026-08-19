@@ -1,4 +1,4 @@
-const mediaController = require('../../src/controllers/media.controller');
+const mediaController = require('../../../src/controllers/media.controller');
 
 async function runTest() {
   console.log('--- BẮT ĐẦU TEST videoUploadInvalidFormat.test.js ---');
