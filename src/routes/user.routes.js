@@ -458,5 +458,8 @@ router.patch('/:id/status', authMiddleware, checkPermission('users:write'), user
  *         description: Chưa đăng nhập
  */
 router.delete('/:id', authMiddleware, checkPermission('users:write'), userController.deleteUser);
+router.post('/:id/restore', authMiddleware, checkPermission('users:write'), userController.restoreUser);
+router.patch('/:id/restore', authMiddleware, checkPermission('users:write'), userController.restoreUser);
+router.delete('/:id/permanent', authMiddleware, checkPermission('users:write'), userController.permanentDeleteUser);
 
 module.exports = router;
