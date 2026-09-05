@@ -25,6 +25,11 @@ const DEFAULT_MARKETING_CONFIG = {
   newsletterBroadcastEnabled: false,
   // Giới hạn an toàn số người nhận mỗi lần gửi bản tin (tránh gửi ồ ạt ngoài ý muốn)
   newsletterMaxRecipients: 500,
+  // Khoảng cách tối thiểu (ngày) giữa 2 email marketing bất kỳ gửi cho CÙNG 1
+  // khách hàng - chống làm phiền khi nhiều automation (nurture/win-back/bản
+  // tin) cùng đủ điều kiện gửi trong 1 khoảng thời gian ngắn. Không áp dụng
+  // cho email cảm ơn (chỉ gửi đúng 1 lần khi chốt deal, mang tính giao dịch).
+  minGapBetweenEmailsDays: 3,
 };
 
 class MarketingAutomationService {
@@ -56,6 +61,7 @@ class MarketingAutomationService {
       winBackDays: toPositiveNumber(partial.winBackDays, current.winBackDays),
       newsletterBroadcastEnabled: toBool(partial.newsletterBroadcastEnabled, current.newsletterBroadcastEnabled),
       newsletterMaxRecipients: toPositiveNumber(partial.newsletterMaxRecipients, current.newsletterMaxRecipients),
+      minGapBetweenEmailsDays: toPositiveNumber(partial.minGapBetweenEmailsDays, current.minGapBetweenEmailsDays),
     };
 
     // Đảm bảo mốc "day5" luôn diễn ra sau mốc "day2" để tránh cấu hình sai
@@ -79,6 +85,21 @@ class MarketingAutomationService {
   getUnsubscribeUrl(leadId) {
     const base = (env.BACKEND_URL && env.BACKEND_URL.trim()) || 'https://api.hto.edu.vn';
     return `${base.replace(/\/+$/, '')}/api/v1/marketing/unsubscribe/${leadId}`;
+  }
+
+  /**
+   * Kiểm tra xem 1 lead có đang trong "khoảng nghỉ" giữa 2 email marketing
+   * hay không (đã nhận 1 email marketing khác gần đây, chưa đủ số ngày tối
+   * thiểu theo cấu hình) - giúp tránh dội nhiều email marketing liên tiếp cho
+   * cùng 1 khách hàng khi nhiều automation cùng đủ điều kiện gửi.
+   * @param {{lastMarketingEmailAt?: Date|null}} lead
+   * @param {{minGapBetweenEmailsDays: number}} config
+   */
+  _isWithinQuietGap(lead, config) {
+    if (!lead || !lead.lastMarketingEmailAt) return false;
+    const gapMs = (config.minGapBetweenEmailsDays || 0) * 24 * 60 * 60 * 1000;
+    if (gapMs <= 0) return false;
+    return Date.now() - new Date(lead.lastMarketingEmailAt).getTime() < gapMs;
   }
 
   // ==========================================================
@@ -110,10 +131,11 @@ class MarketingAutomationService {
 
     for (const lead of day2Leads) {
       try {
+        if (this._isWithinQuietGap(lead, config)) continue; // vừa nhận 1 email marketing khác gần đây - để dịp sau
         const unsubscribeUrl = this.getUnsubscribeUrl(lead._id);
         await mailService.sendNurtureEmail(lead.email, lead.customerName, 'day2', unsubscribeUrl);
         await Lead.findByIdAndUpdate(lead._id, {
-          $set: { nurtureStage: 'day2', nurtureLastSentAt: new Date() },
+          $set: { nurtureStage: 'day2', nurtureLastSentAt: new Date(), lastMarketingEmailAt: new Date() },
         });
         day2Sent += 1;
       } catch (error) {
@@ -133,10 +155,11 @@ class MarketingAutomationService {
 
     for (const lead of day5Leads) {
       try {
+        if (this._isWithinQuietGap(lead, config)) continue; // vừa nhận 1 email marketing khác gần đây - để dịp sau
         const unsubscribeUrl = this.getUnsubscribeUrl(lead._id);
         await mailService.sendNurtureEmail(lead.email, lead.customerName, 'day5', unsubscribeUrl);
         await Lead.findByIdAndUpdate(lead._id, {
-          $set: { nurtureStage: 'day5', nurtureLastSentAt: new Date() },
+          $set: { nurtureStage: 'day5', nurtureLastSentAt: new Date(), lastMarketingEmailAt: new Date() },
         });
         day5Sent += 1;
       } catch (error) {
@@ -210,9 +233,10 @@ class MarketingAutomationService {
     let sent = 0;
     for (const lead of eligibleLeads) {
       try {
+        if (this._isWithinQuietGap(lead, config)) continue; // vừa nhận 1 email marketing khác gần đây - để dịp sau
         const unsubscribeUrl = this.getUnsubscribeUrl(lead._id);
         await mailService.sendWinBackEmail(lead.email, lead.customerName, unsubscribeUrl);
-        await Lead.findByIdAndUpdate(lead._id, { $set: { winBackSentAt: new Date() } });
+        await Lead.findByIdAndUpdate(lead._id, { $set: { winBackSentAt: new Date(), lastMarketingEmailAt: new Date() } });
         sent += 1;
       } catch (error) {
         console.error(`[MarketingAutomationService] Lỗi khi gửi email tái kết nối cho lead ${lead._id}:`, error.message);
@@ -262,6 +286,7 @@ class MarketingAutomationService {
             _id: '$email',
             leadId: { $first: '$_id' },
             customerName: { $first: '$customerName' },
+            lastMarketingEmailAt: { $max: '$lastMarketingEmailAt' },
           },
         },
         { $limit: config.newsletterMaxRecipients },
@@ -269,10 +294,19 @@ class MarketingAutomationService {
 
       let sent = 0;
       for (const recipient of recipients) {
+        // Bỏ qua khách vừa nhận 1 email marketing khác gần đây (chống làm
+        // phiền) - bản tin đợt này sẽ không tới họ, nhưng vẫn nhận được ở
+        // đợt phát hành tiếp theo như bình thường.
+        if (this._isWithinQuietGap(recipient, config)) continue;
+
         const unsubscribeUrl = this.getUnsubscribeUrl(recipient.leadId);
         mailService
           .sendNewsletterEmail(recipient._id, recipient.customerName, newsPost, unsubscribeUrl)
           .catch(() => {});
+        // Cập nhật cho MỌI lead cùng email (1 khách có thể có nhiều lead theo
+        // thời gian) để việc giới hạn tần suất áp dụng nhất quán, giống cách
+        // unsubscribeByLeadId() đang xử lý trùng email.
+        Lead.updateMany({ email: recipient._id }, { $set: { lastMarketingEmailAt: new Date() } }).catch(() => {});
         sent += 1;
       }
 

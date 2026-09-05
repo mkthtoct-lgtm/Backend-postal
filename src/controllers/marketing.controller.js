@@ -1,4 +1,5 @@
 const marketingAutomationService = require('../services/marketingAutomation.service');
+const mailService = require('../services/mail.service');
 
 /**
  * Khung HTML tối giản, tự chứa (không phụ thuộc file tĩnh) để hiển thị kết
@@ -132,6 +133,92 @@ class MarketingController {
         success: false,
         message: 'Lỗi máy chủ khi chạy kiểm tra Marketing Automation.',
         error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Lấy danh sách các loại email (CRM + Marketing) hỗ trợ xem trước/gửi thử.
+   * GET /marketing/templates
+   */
+  async listTemplates(req, res) {
+    try {
+      return res.status(200).json({
+        success: true,
+        message: 'Lấy danh sách mẫu email thành công.',
+        data: mailService.getPreviewableTemplates(),
+      });
+    } catch (error) {
+      console.error('[MarketingController] Lỗi khi lấy danh sách mẫu email:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi lấy danh sách mẫu email.',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Xem trước giao diện HTML của 1 loại email bằng dữ liệu mẫu (KHÔNG gửi
+   * email thật) - dùng để Admin duyệt lại thiết kế trước khi tin tưởng để hệ
+   * thống tự động gửi.
+   * GET /marketing/preview/:template
+   */
+  async previewTemplate(req, res) {
+    try {
+      const { template } = req.params;
+      const rendered = mailService.getTemplatePreview(template);
+
+      if (!rendered) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy loại email mẫu tương ứng.',
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Lấy bản xem trước email thành công.',
+        data: rendered,
+      });
+    } catch (error) {
+      console.error('[MarketingController] Lỗi khi xem trước email:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi xem trước email.',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Gửi thật 1 email mẫu (dữ liệu giả lập) tới địa chỉ do Admin chỉ định, để
+   * kiểm tra hiển thị trên hộp thư thật trước khi tin tưởng tự động hoá.
+   * POST /marketing/send-test
+   */
+  async sendTestEmail(req, res) {
+    try {
+      const { template, email } = req.body || {};
+      const targetEmail = (email || req.user?.email || '').trim();
+
+      if (!targetEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng cung cấp địa chỉ email nhận thử.',
+        });
+      }
+
+      await mailService.sendTestEmail(template, targetEmail);
+
+      return res.status(200).json({
+        success: true,
+        message: `Đã gửi email thử tới ${targetEmail}.`,
+      });
+    } catch (error) {
+      console.error('[MarketingController] Lỗi khi gửi email thử:', error);
+      return res.status(400).json({
+        success: false,
+        message: error.message || 'Không thể gửi email thử. Vui lòng kiểm tra lại cấu hình SMTP.',
       });
     }
   }

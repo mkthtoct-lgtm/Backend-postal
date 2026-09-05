@@ -61,6 +61,11 @@ app.use(responseNormalizer);
 // Cấu hình phục vụ file tĩnh vật lý từ thư mục /uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Phục vụ tài nguyên thương hiệu tĩnh đi kèm mã nguồn (logo, linh vật...) -
+// tách biệt với /uploads (file người dùng tải lên) vì đây là asset cố định
+// của hệ thống, dùng trong email HTML (marketing/CRM automation), v.v.
+app.use('/assets', express.static(path.join(__dirname, '../public/assets')));
+
 // Khai báo giao diện tài liệu API (Swagger UI)
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 

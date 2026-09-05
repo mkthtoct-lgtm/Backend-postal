@@ -90,4 +90,66 @@ router.post('/config', authMiddleware, checkPermission('settings:manage'), marke
  */
 router.post('/run-now', authMiddleware, checkPermission('settings:manage'), marketingController.runNow);
 
+/**
+ * @swagger
+ * /marketing/templates:
+ *   get:
+ *     summary: Lấy danh sách các loại email (CRM nội bộ + Marketing khách hàng) hỗ trợ xem trước/gửi thử
+ *     tags: [Marketing Automation]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách thành công
+ */
+router.get('/templates', authMiddleware, checkPermission('settings:manage'), marketingController.listTemplates);
+
+/**
+ * @swagger
+ * /marketing/preview/{template}:
+ *   get:
+ *     summary: Xem trước giao diện HTML của 1 loại email bằng dữ liệu mẫu (không gửi email thật)
+ *     tags: [Marketing Automation]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: template
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: newsletter
+ *     responses:
+ *       200:
+ *         description: Lấy bản xem trước thành công
+ *       404:
+ *         description: Không tìm thấy loại email mẫu tương ứng
+ */
+router.get('/preview/:template', authMiddleware, checkPermission('settings:manage'), marketingController.previewTemplate);
+
+/**
+ * @swagger
+ * /marketing/send-test:
+ *   post:
+ *     summary: Gửi thật 1 email mẫu (dữ liệu giả lập) tới địa chỉ do Admin chỉ định để kiểm tra hiển thị
+ *     tags: [Marketing Automation]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               template: { type: string, example: newsletter }
+ *               email: { type: string, example: admin@hto.edu.vn, description: "Bỏ trống để gửi tới email của chính Admin đang đăng nhập" }
+ *     responses:
+ *       200:
+ *         description: Gửi email thử thành công
+ *       400:
+ *         description: Thiếu email nhận hoặc gửi thất bại
+ */
+router.post('/send-test', authMiddleware, checkPermission('settings:manage'), marketingController.sendTestEmail);
+
 module.exports = router;
