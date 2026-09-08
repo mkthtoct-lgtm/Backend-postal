@@ -129,11 +129,11 @@ const saveBase64Image = (base64Str) => {
 
 class UserController {
   /**
-   * Lấy danh sách toàn bộ người dùng (Có phân trang, tìm kiếm, lọc theo thùng rác)
+   * Lấy danh sách toàn bộ người dùng (Có phân trang, tìm kiếm)
    */
   async getAllUsers(req, res) {
     try {
-      let { search, status, departmentId, isDeleted, showTrash } = req.query;
+      let { search, status, departmentId } = req.query;
 
       search = search ? search.trim() : '';
 
@@ -145,20 +145,12 @@ class UserController {
         });
       }
 
-      const isTrashView = isDeleted === 'true' || isDeleted === true || showTrash === 'true' || showTrash === true;
-
-      const [result, trashCount] = await Promise.all([
-        userService.findAll({ search, status, departmentId, isDeleted: isTrashView }),
-        userService.countTrash()
-      ]);
+      const result = await userService.findAll({ search, status, departmentId });
 
       return res.status(200).json({
         success: true,
         message: 'Lấy danh sách người dùng thành công.',
-        data: {
-          ...result,
-          trashCount,
-        },
+        data: result,
       });
     } catch (error) {
       return res.status(500).json({
@@ -656,7 +648,7 @@ class UserController {
   }
 
   /**
-   * Xóa mềm tài khoản người dùng (Soft Delete - chuyển vào thùng rác)
+   * Xóa mềm tài khoản người dùng (Soft Delete - ẩn khỏi danh sách)
    */
   async deleteUser(req, res) {
     try {
@@ -670,19 +662,11 @@ class UserController {
         });
       }
 
-      // Ngăn chặn tự xóa tài khoản đang đăng nhập
-      if (req.user && (req.user.sub === id || req.user._id?.toString() === id)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Không thể tự xóa tài khoản bạn đang sử dụng.',
-        });
-      }
-
       const user = await userService.findById(id);
       if (!user) {
         return res.status(404).json({
           success: false,
-          message: 'Người dùng không tồn tại hoặc đã bị chuyển vào thùng rác trước đó.',
+          message: 'Người dùng không tồn tại hoặc đã bị xóa trước đó.',
         });
       }
 
@@ -693,127 +677,19 @@ class UserController {
       const auditLogService = require('../services/auditLog.service');
       auditLogService.log(
         req.user.sub,
-        'user.delete',
+        'user.update',
         { type: 'user', id: user._id.toString(), name: user.fullName },
-        { deleted: true, softDelete: true }
+        { deleted: true }
       );
 
       return res.status(200).json({
         success: true,
-        message: 'Đã chuyển tài khoản người dùng vào thùng rác thành công.',
+        message: 'Xóa tài khoản người dùng thành công (ẩn danh sách).',
       });
     } catch (error) {
       return res.status(500).json({
         success: false,
         message: 'Lỗi máy chủ khi xóa người dùng.',
-        error: error.message,
-      });
-    }
-  }
-
-  /**
-   * Khôi phục tài khoản người dùng từ thùng rác (Restore)
-   */
-  async restoreUser(req, res) {
-    try {
-      const { id } = req.params;
-
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({
-          success: false,
-          message: 'ID người dùng không hợp lệ.',
-        });
-      }
-
-      const User = require('../models/User');
-      const user = await User.findById(id);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'Người dùng không tồn tại.',
-        });
-      }
-
-      if (!user.deletedAt) {
-        return res.status(400).json({
-          success: false,
-          message: 'Tài khoản này đang hoạt động bình thường (không ở trong thùng rác).',
-        });
-      }
-
-      const restoredUser = await userService.restore(id);
-
-      const auditLogService = require('../services/auditLog.service');
-      auditLogService.log(
-        req.user.sub,
-        'user.update',
-        { type: 'user', id: user._id.toString(), name: user.fullName },
-        { restored: true }
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: 'Khôi phục tài khoản người dùng thành công.',
-        data: restoredUser,
-      });
-    } catch (error) {
-      return res.status(500).json({
-        success: false,
-        message: 'Lỗi máy chủ khi khôi phục người dùng.',
-        error: error.message,
-      });
-    }
-  }
-
-  /**
-   * Xóa vĩnh viễn tài khoản người dùng khỏi cơ sở dữ liệu (Permanent / Hard Delete)
-   */
-  async permanentDeleteUser(req, res) {
-    try {
-      const { id } = req.params;
-
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({
-          success: false,
-          message: 'ID người dùng không hợp lệ.',
-        });
-      }
-
-      // Ngăn chặn tự xóa vĩnh viễn tài khoản đang đăng nhập
-      if (req.user && (req.user.sub === id || req.user._id?.toString() === id)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Không thể xóa vĩnh viễn tài khoản đang đăng nhập.',
-        });
-      }
-
-      const User = require('../models/User');
-      const user = await User.findById(id);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'Người dùng không tồn tại hoặc đã bị xóa vĩnh viễn trước đó.',
-        });
-      }
-
-      await userService.permanentDelete(id);
-
-      const auditLogService = require('../services/auditLog.service');
-      auditLogService.log(
-        req.user.sub,
-        'user.delete',
-        { type: 'user', id: user._id.toString(), name: user.fullName },
-        { permanentDelete: true }
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: 'Đã xóa vĩnh viễn tài khoản người dùng khỏi hệ thống.',
-      });
-    } catch (error) {
-      return res.status(500).json({
-        success: false,
-        message: 'Lỗi máy chủ khi xóa vĩnh viễn người dùng.',
         error: error.message,
       });
     }

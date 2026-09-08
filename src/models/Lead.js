@@ -165,6 +165,14 @@ const leadSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Thời điểm gần nhất NHẬN BẤT KỲ email marketing nào (nurture/win-back/
+    // newsletter) - dùng chung để giới hạn tần suất tối thiểu giữa 2 email
+    // marketing liên tiếp (chống làm phiền khách hàng khi nhiều automation
+    // cùng đủ điều kiện gửi trong 1 khoảng thời gian ngắn).
+    lastMarketingEmailAt: {
+      type: Date,
+      default: null,
+    },
 
     deletedAt: {
       type: Date,

@@ -184,15 +184,6 @@ class SchoolService {
         }
       });
 
-      // Tự động phát hiện và sửa nếu sheet bị gán nhầm Tên trường thành Khu vực và ngược lại
-      const nameLooksLikeRegion = /^(Miền|Khu vực|Vùng|Seoul|Busan|Daegu|Incheon|Gwangju|Daejeon|Ulsan|Đài Bắc|Đài Nam|Đài Trung|Cao Hùng)/i.test(doc.name || '');
-      const regionLooksLikeName = /(University|Đại học|College|Academy|Trường|Viện|Học viện)/i.test(doc.region || '');
-      if (nameLooksLikeRegion && regionLooksLikeName) {
-        const temp = doc.name;
-        doc.name = doc.region;
-        doc.region = temp;
-      }
-
       // Must have a name
       if (!doc.name) continue;
       schools.push(doc);
@@ -213,11 +204,12 @@ class SchoolService {
     return { count: schools.length, headers };
   }
 
-  async findSchools({ search, region, admissionSystem, country, program, page = 1, limit = 1000 } = {}) {
+  // ──── SCHOOLS CRUD ────────────────────────────────────────────────────────
+  async findSchools({ search, region, admissionSystem, country, program, page = 1, limit = 100 } = {}) {
     const query = { isActive: true };
 
-    if (country && country.toLowerCase() !== 'all') query.country = country;
-    if (program && program.toLowerCase() !== 'all') query.program = program;
+    if (country && country !== 'all') query.country = country;
+    if (program && program !== 'all') query.program = program;
 
     if (region && region !== 'all') {
       query.region = { $regex: region, $options: 'i' };

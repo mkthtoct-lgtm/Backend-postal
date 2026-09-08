@@ -45,12 +45,10 @@ class UserService {
   }
 
   /**
-   * Lấy danh sách người dùng có phân trang và tìm kiếm (hỗ trợ lọc danh sách hoạt động hoặc thùng rác)
+   * Lấy danh sách người dùng có phân trang và tìm kiếm (loại trừ các bản ghi xóa mềm)
    */
-  async findAll({ search = '', status, departmentId, isDeleted = false } = {}) {
-    const filter = (isDeleted === true || isDeleted === 'true')
-      ? { deletedAt: { $ne: null } }
-      : { deletedAt: null };
+  async findAll({ search = '', status, departmentId } = {}) {
+    const filter = { deletedAt: null };
 
     // Bộ lọc tìm kiếm theo từ khóa (tên hoặc email)
     if (search) {
@@ -78,9 +76,7 @@ class UserService {
 
     const users = await User.find(filter)
       .select('-passwordHash')
-      .populate('roleId')
-      .populate('departmentId')
-      .sort({ updatedAt: -1, createdAt: -1 });
+      .sort({ createdAt: -1 });
 
     return {
       users,
@@ -194,36 +190,6 @@ class UserService {
       },
       { returnDocument: 'after' }
     ).select('-passwordHash');
-  }
-
-  /**
-   * Khôi phục tài khoản người dùng từ thùng rác
-   */
-  async restore(userId) {
-    return await User.findOneAndUpdate(
-      { _id: userId, deletedAt: { $ne: null } },
-      {
-        $set: {
-          deletedAt: null,
-          status: 'active',
-        },
-      },
-      { returnDocument: 'after' }
-    ).select('-passwordHash').populate('roleId').populate('departmentId');
-  }
-
-  /**
-   * Xóa vĩnh viễn tài khoản người dùng khỏi cơ sở dữ liệu (Hard Delete)
-   */
-  async permanentDelete(userId) {
-    return await User.findOneAndDelete({ _id: userId });
-  }
-
-  /**
-   * Đếm số lượng tài khoản trong thùng rác
-   */
-  async countTrash() {
-    return await User.countDocuments({ deletedAt: { $ne: null } });
   }
 
   /**

@@ -5,22 +5,17 @@ const upload = require('../middlewares/upload');
 const authMiddleware = require('../middlewares/auth');
 const checkPermission = require('../middlewares/checkPermission');
 
-// --- PUBLIC ROUTES (No authMiddleware) ---
-// Yêu cầu JWT xác thực riêng biệt qua req.query.token
-router.get('/stream', mediaController.stream);
-
-// Áp dụng authMiddleware cho tất cả các route bên dưới
+// Áp dụng authMiddleware cho tất cả các route của Media
 router.use(authMiddleware);
-
-// --- PROTECTED ROUTES ---
-// Lấy Token truy cập ngắn hạn (Access URL)
-router.get('/:id/access', checkPermission('media.read'), mediaController.getAccess);
 
 // Lấy danh sách Media (có phân trang & lọc)
 router.get('/', checkPermission('media.read'), mediaController.getAll);
 
 // Lấy chi tiết Media
 router.get('/:id', checkPermission('media.read'), mediaController.getById);
+
+// Download/Preview tài liệu hoặc ảnh
+router.get('/:id/download', checkPermission('media.read'), mediaController.download);
 
 // --- CREATE ROUTES ---
 // Image (Default)
